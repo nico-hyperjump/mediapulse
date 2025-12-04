@@ -1,0 +1,338 @@
+---
+title: System Flow
+---
+
+## System Architecture Overview
+
+The system uses a **modular, event-driven architecture** where agents run independently on their own schedules, communicating through a shared data store and event queue. This design provides:
+
+- **Scalability**: Agents can be scaled independently based on load
+- **Reliability**: Failures in one agent don't block others
+- **Flexibility**: Each agent runs on its optimal schedule
+- **Modularity**: Agents are loosely coupled and can be updated independently
+- **Extensibility**: Plugin-based architecture allows dynamic addition/removal of capabilities (e.g., analysis types) without code changes
+
+## Agent Schedules & Independence
+
+<Mermaid
+  chart="
+flowchart TB
+    subgraph Continuous [Continuous Data Pipeline]
+        QS[Query Strategy Agent<br/>• Entity Graph: Weekly<br/>• Query Optimization: Daily<br/>• Query Generation: On-demand]
+        DC[Data Collection Agent<br/>• Runs every 1-4 hours<br/>• Independent of Query Strategy<br/>• Uses latest queries from DB]
+    end
+    
+    subgraph Newsletter [Newsletter Generation Pipeline]
+        Scheduler[Scheduler Agent<br/>• Daily at 6 AM<br/>• Or user-defined schedule]
+        Analysis[Analysis Agent<br/>• Triggered by Scheduler<br/>• Reads collected data from DB<br/>• Works independently]
+        Content[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Sequential per user<br/>• Works independently]
+        QA[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Works independently]
+        Delivery[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Works independently]
+    end
+    
+    subgraph Background [Background Agents]
+        Learning[Learning Agent<br/>• Daily at midnight<br/>• Analyzes all metrics]
+    end
+    
+    QS -->|Writes entity graph<br/>& queries to DB| DB[(Shared Database)]
+    DC -->|Writes collected<br/>data to DB| DB
+    DB -->|Reads queries| DC
+    DB -->|Reads collected data| Analysis
+    Scheduler -->|Triggers| Analysis
+    Analysis -->|Writes analysis<br/>results to DB| DB
+    DB -->|Reads analysis| Content
+    Scheduler -->|Triggers| Content
+    Content -->|Writes newsletter<br/>to DB| DB
+    DB -->|Reads newsletter| QA
+    Scheduler -->|Triggers| QA
+    QA -->|Writes approval<br/>status to DB| DB
+    DB -->|Reads approved<br/>newsletter| Delivery
+    Scheduler -->|Triggers| Delivery
+    Delivery -->|Writes metrics| DB
+    Learning -->|Reads metrics<br/>Updates configs| DB
+"
+/>
+
+## Independent Agent Flows
+
+### Query Strategy Agent
+
+Triggers:
+
+- Schedule
+- Manual trigger
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Query Strategy Agent<br/>Triggered by Schedule<br/>or Manual trigger] --> B{Entity Graph<br/>Refresh Needed?}
+    B -->|Yes<br/>Weekly| C[Entity Discovery<br/>• Query regulatory APIs<br/>• Scrape company websites<br/>• Extract relationships]
+    B -->|No| D[Query Optimization<br/>• Analyze query performance<br/>• Generate optimized queries]
+    C --> E[Update Entity Graph<br/>in Database]
+    D --> F[Generate New Queries<br/>Store in Database]
+    E --> G[Query Generation<br/>• Use entity graph<br/>• Generate search queries<br/>• Store in Database]
+    F --> G
+    G --> H[Database<br/>Queries available for<br/>Data Collection Agent]
+"
+/>
+
+**Schedule**:
+
+- **Entity Graph Refresh**: Weekly (configurable per ticker)
+- **Query Optimization**: Daily (analyzes previous day's performance)
+- **Query Generation**: On-demand or when entity graph updates
+
+### Data Collection Agent
+
+Triggers:
+
+- Schedule
+- Manual trigger
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Data Collection Agent<br/>Triggered by Schedule<br/>or Manual trigger] --> B[Load Latest Queries<br/>from Database]
+    B --> C[Check Last Collection Time<br/>for each ticker]
+    C --> D{Collection<br/>Needed?}
+    D -->|Yes| E[Parallel Collection<br/>• News APIs<br/>• Social Media<br/>• Market Data<br/>• Earnings]
+    D -->|No<br/>Recent data exists| F[Skip Collection]
+    E --> G[Process & Deduplicate]
+    G --> H[Relevance Scoring]
+    H --> I[Store in Database<br/>with timestamp]
+    I --> J[Database<br/>Fresh data available for<br/>Analysis Agent]
+"
+/>
+
+**Schedule**:
+
+- **Default**: Every 2-4 hours (configurable per ticker)
+- **High-priority tickers**: Every 1 hour
+- **Low-priority tickers**: Every 6-12 hours
+- Runs independently - doesn't wait for Query Strategy
+
+### Newsletter Generation Pipeline
+
+Triggers:
+
+- Schedule
+- Manual trigger
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Newsletter Generation Pipeline<br/>Triggered by Schedule<br/>or Manual trigger] --> B[For each user-ticker<br/>subscription]
+    B --> C[Check Data Freshness<br/>in Database]
+    C --> D{Data Fresh<br/>enough?}
+    D -->|Yes<br/>< 4 hours old| E[Analysis Agent<br/>• Loads enabled analysis plugins<br/>• Reads collected data<br/>• Executes registered analysis types<br/>• Dynamic parallel execution]
+    D -->|No| F[Trigger Data Collection<br/>Agent immediately]
+    F --> E
+    E --> G[Store Analysis Results<br/>in Database<br/>Generic structure with all types]
+    G --> H[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Reads user prefs from DB<br/>• Generates newsletter<br/>• Writes newsletter to DB]
+    H --> I[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Validates content<br/>• Checks compliance<br/>• Writes approval status to DB]
+    I --> J{Approved?}
+    J -->|Yes| K[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Sends email<br/>• Updates dashboard<br/>• Writes metrics to DB]
+    J -->|No| H
+    K --> L[Store Delivery Metrics<br/>in Database]
+"
+/>
+
+**Schedule**:
+
+- **Default**: Daily at 6 AM
+- **User-defined**: User can define a custom schedule for each newsletter
+
+## Event-Driven Communication
+
+<Mermaid
+  chart="
+sequenceDiagram
+    participant QS as Query Strategy Agent
+    participant DB as Database
+    participant DC as Data Collection Agent
+    participant Scheduler as Scheduler Agent
+    participant Analysis as Analysis Agent
+    participant Content as Content Gen Agent
+    participant QA as QA Agent
+    participant Delivery as Delivery Agent
+    participant Learning as Learning Agent
+
+    Note over QS: Weekly: Entity Graph Refresh
+    QS->>DB: Update entity graph
+    QS->>DB: Store generated queries
+
+    Note over DC: Every 2-4 hours: Data Collection
+    DC->>DB: Read latest queries
+    DC->>DC: Collect data from sources
+    DC->>DB: Store collected data (timestamped)
+
+    Note over Scheduler: Daily 6 AM: Newsletter Generation
+    Scheduler->>DB: Check data freshness
+    alt Data stale
+        Scheduler->>DC: Trigger immediate collection
+        DC->>DB: Store fresh data
+    end
+
+    Scheduler->>Analysis: Trigger analysis (independent execution)
+    Analysis->>DB: Read collected data
+    Analysis->>Analysis: Perform analysis
+    Analysis->>DB: Store analysis results
+
+    Scheduler->>Content: Trigger content generation (independent execution)
+    Content->>DB: Read analysis results
+    Content->>DB: Read user prefs
+    Content->>Content: Generate newsletter
+    Content->>DB: Store newsletter draft
+
+    Scheduler->>QA: Trigger QA (independent execution)
+    QA->>DB: Read newsletter draft
+    QA->>QA: Validate content
+    QA->>DB: Store approval status
+    alt Approved
+        Scheduler->>Delivery: Trigger delivery (independent execution)
+        Delivery->>DB: Read approved newsletter
+        Delivery->>Delivery: Send email
+        Delivery->>DB: Store delivery metrics
+        Delivery->>User: Newsletter with feedback buttons
+        User->>DB: Submit section feedback (Like/Dislike, Useful/Irrelevant)
+    else Not Approved
+        Note over Content: Scheduler may retry content generation
+    end
+
+    Note over Learning: Daily midnight: Learning
+    Learning->>DB: Read all metrics + section feedback
+    Learning->>Learning: Analyze patterns
+    Learning->>DB: Update agent configs
+    Note over QS: Query Strategy reads updated configs from DB on next run
+
+"
+/>
+
+## Data Flow & Storage
+
+<Mermaid
+  chart="
+flowchart LR
+    subgraph Agents [Agents]
+        QS[Query Strategy]
+        DC[Data Collection]
+        Analysis[Analysis]
+        Content[Content Gen]
+        Delivery[Delivery]
+        Learning[Learning]
+    end
+    
+    subgraph Storage [Shared Storage Layer]
+        DB[(PostgreSQL<br/>• Entity Graph<br/>• Queries<br/>• Collected Data<br/>• Analysis Results<br/>• Newsletters<br/>• Metrics<br/>• Section Feedback)]
+        Cache[(Redis Cache<br/>• Query results<br/>• Rate limits<br/>• Job queue)]
+        Queue[(Job Queue<br/>BullMQ<br/>• Agent jobs<br/>• Retries<br/>• Priorities)]
+    end
+    
+    QS -->|Write| DB
+    QS -->|Read| DB
+    DC -->|Read queries| DB
+    DC -->|Write data| DB
+    Analysis -->|Read data| DB
+    Analysis -->|Write results| DB
+    Content -->|Read analysis| DB
+    Content -->|Write newsletter| DB
+    Delivery -->|Write metrics| DB
+    User -->|Submit feedback| DB
+    Learning -->|Read metrics + feedback| DB
+    Learning -->|Update configs| DB
+    
+    Agents -->|Jobs| Queue
+    Agents -->|Cache| Cache
+"
+/>
+
+## Key Design Principles
+
+### 1. **Loose Coupling**
+
+- Agents don't directly call each other
+- Agents don't receive data from other agents
+- All communication through shared database
+- Agents read from and write to the database independently
+- Agents can be updated/deployed independently
+
+### 2. **Independent Scheduling**
+
+- Each agent has its own optimal schedule
+- Query Strategy: Weekly/Daily (entity graph vs. queries)
+- Data Collection: Every 1-4 hours (configurable)
+- Newsletter Generation: Daily or user-defined
+- Learning: Daily at midnight
+
+### 3. **Data Freshness Management**
+
+- Data Collection Agent maintains fresh data in database
+- Newsletter pipeline checks data freshness before analysis
+- Can trigger immediate collection if data is stale
+- Timestamps on all data for freshness tracking
+
+### 4. **Scalability**
+
+- Agents can be scaled horizontally (multiple workers)
+- Job queue handles load distribution
+- Database connection pooling
+- Caching layer for frequently accessed data
+
+### 5. **Reliability**
+
+- Failed jobs are retried with exponential backoff
+- Agents continue running even if others fail
+- Data is never lost (persisted before processing)
+- Circuit breakers for external API calls
+
+### 6. **Modularity**
+
+- Each agent is a separate service/worker
+- Can be deployed independently
+- Configuration stored in database (hot-reloadable)
+- Versioned agent deployments
+- **Plugin-based architecture**: Analysis types are plugins registered in the database, allowing addition/removal without code changes
+- Dynamic component loading: Agents discover and load components (analysis types, sections) at runtime
+
+## Error Handling & Resilience
+
+### Per-Agent Error Handling
+
+- **Query Strategy**: Retries entity discovery, falls back to cached entity graph
+- **Data Collection**: Continues with other sources if one fails, retries with backoff
+- **Analysis**: Uses cached analysis if fresh data unavailable
+- **Content Generation**: Retries with different prompts on failure
+- **QA**: Flags for manual review if repeated failures
+- **Delivery**: Retries with exponential backoff, dead-letter queue
+
+### System-Level Resilience
+
+- **Database Failures**: Agents queue jobs for retry when DB is available
+- **Queue Failures**: Jobs persisted to database as backup
+- **Agent Failures**: Other agents continue operating
+- **Data Staleness**: Newsletter pipeline triggers fresh collection if needed
+
+## Configuration & Monitoring
+
+### Agent Configuration
+
+- All configs stored in `AgentConfig` table
+- Hot-reloadable without restart
+- Per-ticker, per-user, and system-wide configs
+- Versioned for rollback capability
+
+### Monitoring & Observability
+
+- Each agent emits metrics (execution time, success rate, data quality)
+- Metrics stored in `AgentMetrics` table
+- Learning Agent analyzes metrics and optimizes configs
+- Dashboard shows agent health, data freshness, pipeline status
+
+## Benefits of This Architecture
+
+1. **Scalability**: Scale Data Collection independently from Newsletter Generation
+2. **Reliability**: Data Collection failures don't block Newsletter Generation (uses cached data)
+3. **Efficiency**: Data Collection runs frequently to keep data fresh, Newsletter uses latest data
+4. **Flexibility**: Easy to add new agents or modify schedules
+5. **Performance**: Parallel execution where possible, caching for speed
+6. **Maintainability**: Clear separation of concerns, easy to debug and update

@@ -1,0 +1,154 @@
+---
+title: Delivery Agent
+---
+
+## Purpose
+
+Deliver approved newsletters via email and update web dashboard, track delivery status.
+
+## Inputs
+
+- `ticker: string` - Company identifier
+- `userId: string` - User identifier
+- `newsletterId: string` - Newsletter identifier
+- `deliveryChannels: ('email' | 'dashboard')[]` - Where to deliver
+- `scheduleTime?: Date` - Optional scheduled delivery time
+
+**Note**: The agent reads approved newsletter content and recipient information directly from the database. It does not receive data from the QA Agent. The agent works independently and queries the database for the approved newsletter and recipient details.
+
+## Configurations
+
+```typescript
+{
+  email: {
+    provider: 'resend' | 'sendgrid',
+    apiKey: string,
+    fromAddress: string,
+    fromName: string,
+    replyTo: string,
+    templates: {
+      daily: 'templates/email-daily.html',
+      weekly: 'templates/email-weekly.html'
+    },
+    retry: {
+      maxAttempts: 3,
+      backoff: 'exponential',
+      delay: 1000
+    },
+    tracking: {
+      openTracking: true,
+      clickTracking: true,
+      unsubscribeLink: true
+    },
+    feedback: {
+      enabled: true,
+      buttonTypes: ['like' | 'dislike' | 'useful' | 'irrelevant' | 'custom'],
+      customButtons?: Array<{ label: string, value: string, icon?: string }>,
+      placement: 'inline' | 'bottom' | 'both',
+      style: 'buttons' | 'icons' | 'text-links'
+    }
+  },
+  dashboard: {
+    updateEndpoint: string,
+    cacheStrategy: 'cache-first' | 'network-first',
+    notificationEnabled: true
+  },
+  rateLimiting: {
+    emailsPerMinute: 100,
+    batchSize: 50
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'delivery',
+  newsletterId: string,
+  timestamp: Date,
+  executionTime: number,
+  delivery: {
+    email: {
+      totalRecipients: number,
+      sent: number,
+      failed: number,
+      pending: number,
+      results: Array<{
+        userId: string,
+        email: string,
+        status: 'sent' | 'failed' | 'bounced',
+        messageId?: string,
+        error?: string,
+        deliveredAt?: Date
+      }>
+    },
+    dashboard: {
+      updated: boolean,
+      publishedAt: Date,
+      url: string
+    }
+  },
+  metadata: {
+    deliveryTime: number,
+    errors: Array<{ type: string, message: string }>
+  }
+}
+```
+
+## Process
+
+1. **Initialize**: Load email config
+2. **Read Data**: Query database for approved newsletter and recipient information (independent of QA Agent)
+3. **Email Delivery** (if enabled):
+
+   - **Personalization**: Customize email for each recipient
+   - **Template Rendering**: Render HTML email with newsletter content
+   - **Feedback Buttons**: Embed interactive feedback buttons in each newsletter section
+     - Each section includes feedback buttons (Like/Dislike, Useful/Irrelevant, or custom options)
+     - Buttons link to feedback API endpoints with section identifiers
+     - Feedback is tracked per section and per user
+   - **Batch Sending**: Send in batches (respect rate limits)
+   - **Tracking**: Add tracking pixels and links
+   - **Error Handling**: Retry failed sends with exponential backoff
+   - **Status Tracking**: Record delivery status for each recipient
+
+3. **Dashboard Update** (if enabled):
+
+   - Save newsletter to database
+   - Update user's newsletter feed
+   - **Interactive Feedback**: Render feedback buttons in dashboard view
+     - Each section displays feedback buttons
+     - Real-time feedback submission via API
+     - Visual feedback confirmation after submission
+   - Invalidate cache if needed
+   - Send notification (if enabled)
+
+4. **Delivery Tracking**:
+
+   - Record delivery attempts and results
+   - Update newsletter status in database
+   - Log metrics for Learning Agent
+   - Track feedback button impressions and clicks
+
+5. **Return**: Delivery results
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler] --> B[Delivery Agent<br/>Triggered independently]
+    B --> C[Agent reads approved newsletter<br/>from Database]
+    C --> C2[Agent reads recipient info<br/>from Database]
+    C2 --> D[Parallel Delivery]
+    
+    D --> E1[Email Delivery<br/>Personalize for each user<br/>Render HTML template<br/>Batch send rate limited<br/>Add tracking<br/>Retry failures]
+    D --> E2[Dashboard Update<br/>Save to database<br/>Update user feeds<br/>Invalidate cache<br/>Send notification]
+    
+    E1 --> F[Track delivery status]
+    E2 --> F
+    F --> G[Write delivery metrics to Database]
+    G --> H[Delivery complete<br/>Metrics available for Learning Agent]
+"
+/>

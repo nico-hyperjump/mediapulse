@@ -1,0 +1,130 @@
+---
+title: Milestone 9 - Enhanced Content Generation
+---
+
+## Summary
+
+Add personalization, A/B testing, improved content formatting, and section-level feedback collection.
+
+## Timeline
+
+Weeks 19-20
+
+## Goal
+
+Enhance content generation with personalization, A/B testing framework, and better formatting.
+
+## Deliverables
+
+### Content Generation Agent (Enhanced)
+
+- ✅ **Personalization System**:
+  - User preference integration (detail level, focus areas)
+  - Tone customization
+  - Content length adjustment
+  - Section emphasis based on preferences
+- ✅ **A/B Testing Framework**:
+  - Variant selection logic
+  - Content structure variations
+  - Style variations
+  - Variant assignment tracking
+- ✅ **Improved Templates**:
+  - Enhanced HTML email template (responsive design)
+  - Better visual formatting
+  - Chart data generation for visualizations
+  - Dashboard template improvements
+- ✅ **Section-Level Feedback System**:
+  - Interactive feedback buttons embedded in each newsletter section
+  - Configurable feedback types (Like/Dislike, Useful/Irrelevant, or custom options)
+  - Section identification and tracking
+  - Feedback API endpoints for collecting user responses
+  - Visual feedback confirmation in both email and dashboard views
+
+### Database Updates
+
+- ✅ User preferences table (if not already exists)
+- ✅ A/B test configuration and results tracking
+- ✅ Section feedback table (sectionId, userId, newsletterId, feedbackType, feedbackValue, timestamp)
+- ✅ Feedback analytics tables for tracking section-level engagement
+
+### Web Dashboard Updates
+
+- ✅ User preferences page (`/settings`)
+- ✅ Preference management UI
+- ✅ A/B test results display (admin)
+- ✅ Interactive feedback buttons in newsletter view
+- ✅ Feedback submission API endpoints
+- ✅ Visual feedback confirmation UI
+
+### Delivery Agent (Update)
+
+- ✅ Feedback button embedding in email templates
+- ✅ Feedback link generation with section identifiers
+- ✅ Feedback impression and click tracking
+- ✅ Interactive feedback buttons in dashboard newsletter view
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 9 - Enhanced Content Generation
+    dateFormat  YYYY-MM-DD
+    section Content Generation
+    User preference integration               :a1, 2026-05-07, 2d
+    Tone customization                       :a2, after a1, 1d
+    Content length adjustment                :a3, after a2, 1d
+    Section emphasis logic                   :a4, after a3, 1d
+    Variant selection logic                  :a5, 2026-05-07, 1d
+    Content structure variations             :a6, after a5, 2d
+    Style variations                         :a7, after a6, 1d
+    Variant assignment tracking              :a8, after a7, 1d
+    Responsive HTML template                 :a9, 2026-05-07, 2d
+    Visual formatting improvements          :a10, after a9, 1d
+    Chart data generation                    :a11, after a10, 1d
+    Dashboard template updates               :a12, after a11, 1d
+    Section identification                  :a13, after a4, 1d
+    Feedback button embedding                :a14, after a13, 1d
+    Feedback API endpoints                   :a15, after a14, 2d
+    section Database
+    User preferences table                   :b1, 2026-05-07, 1d
+    A/B test tables                          :b2, after b1, 1d
+    Section feedback table                   :b3, after b2, 1d
+    Feedback analytics tables                :b4, after b3, 1d
+    section Web Dashboard
+    Preferences page                         :c1, after b1, 2d
+    Preference management UI                 :c2, after c1, 1d
+    A/B test results display                 :c3, after b2, 2d
+    Feedback buttons in newsletter           :c4, after b3, 2d
+    Feedback API endpoints                   :c5, after c4, 1d
+    Feedback confirmation UI                 :c6, after c5, 1d
+    section Delivery Agent
+    Email feedback buttons                   :d1, after a14, 1d
+    Feedback link generation                 :d2, after d1, 1d
+    Impression & click tracking              :d3, after d2, 1d
+    Dashboard feedback buttons               :d4, after c4, 1d
+  "
+/>
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic personalization (no advanced ML-based personalization)
+- Simple A/B testing (no statistical analysis yet)
+- Limited template variations
+- Basic feedback collection (no real-time analytics dashboard yet)
+- Feedback analysis will be enhanced in Milestone 12 (Learning Agent)
+
+## Success Criteria
+
+- ✅ Personalization reflects user preferences
+- ✅ Different users receive different content styles
+- ✅ A/B test variants are properly assigned
+- ✅ Email templates render correctly
+- ✅ User preferences are saved and applied
+- ✅ Feedback buttons appear in each newsletter section
+- ✅ Feedback submissions are successfully recorded
+- ✅ Feedback is tracked per section and per user
+
+## Next Steps
+
+After this milestone, content is personalized. Milestone 10 will add advanced data sources (earnings, SEC filings).

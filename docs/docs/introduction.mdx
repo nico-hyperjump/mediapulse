@@ -1,0 +1,63 @@
+---
+title: Introduction
+---
+
+## Features
+
+### Data & Intelligence
+
+- **Intelligent Data Collection**: Automatically gathers information from news sites, social media platforms, and public media sources using targeted search queries and intelligent web scraping
+- **Entity Intelligence**: Maintains dynamic entity relationship graphs (competitors, suppliers, customers, executives, partners) to enhance search queries and provide comprehensive business context
+
+### AI & Analysis
+
+- **Multi-Agent Architecture**: Specialized AI agents handle different aspects of the pipeline (data collection, analysis, content generation, quality assurance, delivery, learning) for optimal performance and maintainability
+- **Comprehensive Analysis**: Performs sentiment analysis to understand public perception, competitive landscape research to monitor what's being said about competitors in the media, and event/context analysis to identify external events (natural disasters, political changes, regulatory updates, economic shifts, social movements) that could affect the company
+- **Extensible Plugin System**: Analysis capabilities are built on a plugin-based architecture that allows easy addition, removal, or modification of analysis types without code changes. New analysis types can be registered in the database and automatically integrated into the system
+- **Self-Improving System**: Learning agent analyzes user feedback, engagement metrics, and agent performance to continuously optimize content generation strategies
+- **Agent Versioning**: Complete version history for all agents with admin-controlled production deployments. Learning agent creates optimized versions automatically, while admins maintain full control over which version runs in production with instant rollback capability
+
+### Content & Personalization
+
+- **Personalized Content**: Generates newsletters tailored to each user's preferences, focus areas, and risk tolerance with customizable detail levels and delivery schedules
+- **Executive-Focused Format**: Concise, actionable media insights designed for busy executives who need quick understanding of public perception and media coverage about their companies
+- **A/B Testing**: Built-in A/B testing framework allows experimentation with different content styles, structures, and delivery times to maximize engagement
+
+### Quality & Delivery
+
+- **Quality Assurance**: Automated fact-checking, compliance verification, and quality scoring ensure accurate, compliant, and high-quality content before delivery
+- **Multi-Channel Delivery**: Delivers newsletters via email and web dashboard with tracking, personalization, and responsive design
+- **Interactive Feedback**: Section-level feedback buttons (Like/Dislike, Useful/Irrelevant) allow users to provide granular feedback on newsletter content, enabling continuous improvement and personalization
+
+### Infrastructure & Scalability
+
+- **Database-Driven Configuration**: All system configurations stored in the database for dynamic updates without code deployments
+- **Plugin-Based Extensibility**: Analysis types and other capabilities can be extended through a plugin registry system, enabling runtime addition/removal of features without code changes
+- **Agent Version Management**: Version control system for agents with production deployment controls, performance tracking per version, and instant rollback capabilities
+- **Scalable Architecture**: Queue-based job processing with BullMQ and Redis enables handling multiple tickers and users concurrently
+
+## System Architecture
+
+A modular multi-agent system built with Next.js (App Router), TypeScript, Python, and OpenAI, designed for busy executives who need concise, actionable media monitoring insights.
+
+### Core Components
+
+1. **Query Strategy Agent** - Maintains entity relationships, generates dynamic search queries, detects trends, and learns from successful content
+2. **Data Collection Agent** - Uses queries from Query Strategy Agent to collect data from news sites, social media, and public media sources
+3. **Analysis Agent** - Performs analysis using a plugin-based system. By default includes sentiment analysis, competitive landscape research, and event/context analysis. New analysis types can be added dynamically via database registration
+4. **Content Generation Agent** - Creates newsletter content using AI with consistent formatting and tone
+5. **Quality Assurance Agent** - Validates content quality, fact-checks, and ensures compliance
+6. **Delivery Agent** - Handles email delivery and web dashboard updates
+7. **Learning Agent** - Tracks metrics, learns from user feedback, optimizes content generation, and creates new agent versions with improvements
+8. **Scheduler Agent** - Manages periodic tasks and job orchestration
+
+## Technical Stack
+
+- **Framework**: Next.js 16+ (App Router) with TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Queue System**: BullMQ with Redis for job processing
+- **AI Provider**: OpenAI (GPT-4) with fallback support
+- **Email**: Resend or SendGrid
+- **Web Scraping**: Playwright for dynamic content, Cheerio for static
+- **Authentication**: NextAuth.js for user management
+- **Monitoring**: Custom metrics dashboard + error tracking

@@ -1,0 +1,186 @@
+---
+title: Scheduler Agent
+---
+
+## Purpose
+
+Orchestrate the entire newsletter generation pipeline, schedule jobs, and coordinate agent execution.
+
+## Inputs
+
+- `schedule: ScheduleConfig` - Schedule configuration (daily, weekly, custom)
+- `userTickers: Array<{ userId: string, tickers: string[], preferences: UserPreferences }>` - User subscriptions
+- `trigger: 'scheduled' | 'manual' | 'event-driven'` - Execution trigger
+
+## Configurations
+
+This is the configuration for the scheduler agent. It is stored in the `AgentConfig` table, key: `scheduler`.
+
+```typescript
+{
+  scheduler: {
+    type: 'cron' | 'interval',
+    cronExpression: '0 6 * * *', // Daily at 6 AM
+    timezone: 'America/New_York',
+    enabled: true
+  },
+  pipeline: {
+    agents: [
+      'data-collection',
+      'analysis',
+      'content-generation',
+      'quality-assurance',
+      'delivery'
+    ],
+    parallelism: {
+      dataCollection: true, // Can run for multiple tickers in parallel
+      analysis: true,
+      contentGeneration: false, // Sequential per user
+      qualityAssurance: false,
+      delivery: true
+    },
+    retry: {
+      maxRetries: 3,
+      backoff: 'exponential',
+      delay: 5000
+    },
+    timeout: {
+      dataCollection: 300000, // 5 min
+      analysis: 180000, // 3 min
+      contentGeneration: 240000, // 4 min
+      qualityAssurance: 120000, // 2 min
+      delivery: 300000 // 5 min
+    }
+  },
+  queue: {
+    provider: 'bullmq',
+    redisUrl: string,
+    concurrency: 5,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 }
+    }
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'scheduler',
+  jobId: string,
+  timestamp: Date,
+  executionTime: number,
+  pipeline: {
+    status: 'completed' | 'failed' | 'partial',
+    stages: Array<{
+      stage: string,
+      agent: string,
+      status: 'pending' | 'running' | 'completed' | 'failed',
+      startTime: Date,
+      endTime?: Date,
+      executionTime?: number,
+      error?: string,
+      output?: object
+    }>
+  },
+  results: {
+    newslettersGenerated: number,
+    newslettersDelivered: number,
+    failures: number,
+    errors: Array<{ stage: string, error: string }>
+  },
+  metadata: {
+    tickersProcessed: number,
+    usersProcessed: number,
+    totalExecutionTime: number
+  }
+}
+```
+
+## Process
+
+1. **Initialize**: Load schedule config, connect to job queue
+2. **Job Creation**:
+
+   - For each user-ticker combination, create pipeline job
+   - Set job priority based on user tier/preferences
+   - Schedule execution time
+
+3. **Pipeline Execution** (for each job):
+
+   - **Stage 1: Data Collection**
+     - Trigger Data Collection Agent (independent execution)
+     - Agent reads queries from database, collects data, writes to database
+     - Wait for completion (with timeout)
+     - Handle errors/retries
+   - **Stage 2: Analysis**
+     - Trigger Analysis Agent (independent execution)
+     - Agent reads collected data from database, performs analysis, writes results to database
+     - Wait for completion
+     - Handle errors/retries
+   - **Stage 3: Content Generation**
+     - Trigger Content Generation Agent (independent execution)
+     - Agent reads analysis results and user preferences from database, generates newsletter, writes to database
+     - Wait for completion
+     - Handle errors/retries
+   - **Stage 4: Quality Assurance**
+     - Trigger QA Agent (independent execution)
+     - Agent reads newsletter from database, validates, writes approval status to database
+     - If not approved, either retry content generation or flag
+     - Wait for approval
+   - **Stage 5: Delivery**
+     - Trigger Delivery Agent (independent execution)
+     - Agent reads approved newsletter from database, sends email, writes metrics to database
+     - Wait for completion
+     - Handle errors/retries
+
+4. **Parallelization**:
+
+   - Run data collection for multiple tickers in parallel
+   - Run analysis in parallel
+   - Run content generation sequentially per user (personalization)
+   - Run delivery in parallel
+
+5. **Error Handling**:
+
+   - Retry failed stages with exponential backoff
+   - Log errors for monitoring
+   - Notify on critical failures
+
+6. **Metrics Collection**:
+
+   - Track execution times for each stage
+   - Record success/failure rates
+   - Send metrics to Learning Agent
+
+7. **Return**: Pipeline execution results
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Cron Trigger / Manual] --> B[Scheduler Agent]
+    B --> C[Load user-ticker subscriptions]
+    C --> D[Create pipeline jobs<br/>one per user-ticker]
+    D --> E[Pipeline Execution]
+    
+    subgraph Pipeline [Pipeline Execution per job]
+        direction TB
+        S1[Stage 1: Data Collection<br/>Trigger Data Collection Agent<br/>Agent reads queries from DB<br/>Agent writes data to DB<br/>Wait & Handle errors/retries] --> S2[Stage 2: Analysis<br/>Trigger Analysis Agent<br/>Agent reads data from DB<br/>Agent writes analysis to DB<br/>Wait & Handle errors/retries]
+        S2 --> S3[Stage 3: Content Generation<br/>Trigger Content Gen Agent<br/>Agent reads analysis from DB<br/>Agent writes newsletter to DB<br/>Wait & Handle errors/retries]
+        S3 --> S4[Stage 4: Quality Assurance<br/>Trigger QA Agent<br/>Agent reads newsletter from DB<br/>Agent writes approval to DB]
+        S4 --> S4B{Approved?}
+        S4B -->|No| S4C[Retry/fail]
+        S4B -->|Yes| S5[Stage 5: Delivery<br/>Trigger Delivery Agent<br/>Agent reads newsletter from DB<br/>Agent writes metrics to DB<br/>Wait & Handle errors/retries]
+        S4C --> S5
+    end
+    
+    E --> Pipeline
+    Pipeline --> F[Collect metrics & write to Database]
+    F --> G[Learning Agent reads metrics from DB independently]
+    G --> H[Return pipeline results]
+"
+/>

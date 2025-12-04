@@ -1,0 +1,188 @@
+---
+title: Q2 - Collect & Analyze
+---
+
+## Milestone 2.1
+
+### Summary
+
+Query Strategy Agent
+
+### Goal
+
+Implement the Query Strategy Agent that discovers entities and generates intelligent search queries.
+
+### Deliverables
+
+- ✅ Query Strategy Agent implementation (`packages/agents/query-strategy/`)
+- ✅ Entity discovery system:
+  - SEC EDGAR API integration for filings (10-K, 10-Q, 8-K)
+  - Company website scraping for executive information
+  - AI-powered entity extraction from documents
+  - Entity graph database structure
+- ✅ Relationship extraction:
+  - Competitor identification
+  - Supplier/customer relationship mapping
+  - Executive tracking
+  - Industry peer identification
+- ✅ Dynamic query generation:
+  - Base query construction from ticker/entities
+  - AI-enhanced query generation
+  - Query prioritization and scoring
+  - Multi-variant query creation
+- ✅ Keyword tracking system:
+  - Trend detection
+  - Emerging keyword identification
+  - Keyword relevance scoring
+- ✅ Query optimization based on historical performance
+- ✅ Entity graph storage and retrieval
+- ✅ Comprehensive unit and integration tests
+
+### Success Criteria
+
+- Agent discovers entities for test tickers (AAPL, TSLA, MSFT)
+- Generates 20+ relevant queries per ticker
+- Entity graph contains accurate relationships
+- Query performance improves over time with optimization
+
+---
+
+## Milestone 2.2
+
+### Summary
+
+Data Collection Agent - Core Sources
+
+### Goal
+
+Implement data collection from news sources and social media.
+
+### Deliverables
+
+- ✅ Data Collection Agent implementation (`packages/agents/data-collection/`)
+- ✅ News source integrations:
+  - NewsAPI integration with targeted queries
+  - Google News API integration
+  - Web scraping framework (Playwright + Cheerio):
+    - Bloomberg scraping (with selectors)
+    - Reuters scraping
+    - WSJ scraping (if accessible)
+    - CNBC scraping
+  - RSS feed parsing with company filtering
+- ✅ Social media monitoring:
+  - Twitter/X API integration (v2)
+  - Reddit API integration
+  - Query-based search with quality filters
+- ✅ Rate limiting and retry mechanisms per source
+- ✅ Data deduplication system:
+  - Title similarity matching
+  - Content similarity (AI-powered)
+  - URL matching
+- ✅ Relevance scoring system (AI-powered)
+- ✅ Data storage to DataSource table
+- ✅ Source health monitoring
+
+### Success Criteria
+
+- Collects 50+ news articles per company per day
+- Collects 100+ social media posts per company per day
+- Deduplication removes 90%+ of duplicates
+- Relevance scoring filters low-quality content effectively
+
+---
+
+## Milestone 2.3
+
+### Summary
+
+Data Collection Agent - Advanced Features
+
+### Goal
+
+Complete data collection with earnings calls, SEC filings, and advanced processing.
+
+### Deliverables
+
+- ✅ Earnings call integration:
+  - SEC EDGAR API for earnings filings
+  - Transcript fetching from multiple sources
+  - AI-powered transcript summarization
+  - Key metrics extraction (revenue, EPS, guidance)
+- ✅ SEC filings processing:
+  - 8-K, 10-Q, 10-K filing retrieval
+  - Entity relationship extraction from filings
+- ✅ Advanced data enrichment:
+  - Sentiment pre-calculation
+  - Entity extraction from content
+  - Language detection
+  - Metadata extraction
+- ✅ Source configuration management:
+  - Dynamic source enable/disable
+  - Source-specific rate limits
+  - Source health status tracking
+- ✅ Error handling and recovery:
+  - Graceful degradation when sources fail
+  - Automatic source disabling after repeated failures
+  - Error notification system
+- ✅ Data collection metrics and monitoring dashboard
+- ✅ End-to-end data collection pipeline tests
+
+### Success Criteria
+
+- Successfully retrieves earnings transcripts for test tickers
+- Extracts key metrics from earnings calls with 95%+ accuracy
+- Processes SEC filings and extracts entity relationships
+- System handles source failures gracefully
+- Data collection dashboard shows real-time metrics
+
+---
+
+## Milestone 2.4
+
+### Summary
+
+Analysis Agent Implementation
+
+### Timeline
+
+Weeks 25-28
+
+### Goal
+
+Build comprehensive analysis capabilities (competitive, sentiment, event/context).
+
+### Deliverables
+
+- ✅ Analysis Agent implementation (`packages/agents/analysis/`)
+- ✅ Competitive analysis module:
+  - Peer group identification
+  - Media coverage comparison across competitors
+  - Industry trend analysis in media coverage
+  - Competitive positioning assessment
+  - AI-powered competitive summary
+- ✅ Sentiment analysis module:
+  - News sentiment analysis (AI-powered)
+  - Social media sentiment analysis
+  - Weighted sentiment calculation with time decay
+  - Sentiment trend detection
+  - AI-powered sentiment summary
+- ✅ Event/context analysis module:
+  - External event identification (natural disasters, political changes, regulatory updates, economic shifts, social movements)
+  - Relevance scoring for events
+  - Impact assessment (operations, reputation, strategy)
+  - Early warning signal detection
+  - Opportunity identification
+  - AI-powered event summary
+- ✅ Insight extraction system:
+  - Cross-analysis insight identification
+  - Priority scoring for insights
+  - AI-powered insight generation
+- ✅ Analysis result storage and caching
+- ✅ Comprehensive test suite
+
+### Success Criteria
+
+- Identifies peer groups and performs media coverage comparisons
+- Sentiment scores align with manual review
+- Events are identified accurately with appropriate relevance scores
+- Insights are relevant and actionable

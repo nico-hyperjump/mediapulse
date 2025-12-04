@@ -1,0 +1,138 @@
+---
+title: Milestone 1 - Foundation & Basic Pipeline
+---
+
+## Summary
+
+Establish the technical foundation and build the minimal agent framework to support the pipeline.
+
+## Timeline
+
+Weeks 1-4
+
+## Goal
+
+Create the database foundation, basic agent framework, and minimal scheduler that can orchestrate a simple pipeline.
+
+## Deliverables
+
+### Database & Infrastructure
+
+- ✅ Monorepo structure with Turborepo configured
+- ✅ PostgreSQL database with Prisma ORM setup
+- ✅ **Minimal database schema** (only essential tables):
+  - `User` - Basic user information
+  - `Ticker` - Stock symbols
+  - `UserTicker` - User-ticker subscriptions
+  - `Newsletter` - Generated newsletters (with `createdAt` timestamp for freshness tracking)
+  - `NewsletterContent` - Newsletter content (simple text field)
+  - `AgentConfig` - Basic configuration storage
+  - Note: Job tracking handled by BullMQ/Redis (no database tables needed for this milestone)
+- ✅ Database migrations and seed scripts
+- ✅ Redis setup for BullMQ queue system
+- ✅ Environment variable management
+
+### Agent Framework (Minimal)
+
+- ✅ Base Agent class with:
+  - Error handling
+  - Basic logging
+  - Configuration loading from database
+  - Scheduling capability (agents can register their own schedules, but scheduler agent orchestrates pipeline execution)
+- ✅ Agent registry system
+- ✅ Job queue system with BullMQ:
+  - Basic queue setup
+  - Job creation and processing
+  - Simple retry mechanism
+  - Support for independent agent scheduling
+- ✅ Event-driven communication foundation:
+  - Agents communicate through shared database (not direct calls)
+  - Data timestamping for freshness tracking (using `createdAt`/`updatedAt` fields on data tables)
+  - Agents read from and write to database tables to pass data between stages
+
+### Scheduler Agent (Minimal)
+
+- ✅ Basic scheduler that can:
+  - Run on a schedule (cron or interval) - default daily at 6 AM
+  - Create jobs for user-ticker combinations (one job per user-ticker pair)
+  - Execute a simple 3-stage newsletter pipeline sequentially:
+    1. Data Collection (placeholder - returns hardcoded data, stores with timestamp)
+    2. Content Generation (placeholder - generates simple text, reads data from previous stage)
+    3. Delivery (placeholder - saves to database only)
+  - Check data freshness before processing (basic check: compares `Newsletter.createdAt` timestamp to current time; if newsletter exists and is less than 24 hours old, skip processing)
+- ✅ Sequential execution (no parallelism yet)
+- ✅ Basic error handling
+
+### Web Application (Minimal)
+
+- ✅ Next.js 16+ App Router application (`apps/web/` - user dashboard, separate from `apps/marketing/`)
+- ✅ NextAuth.js authentication (email/password only)
+- ✅ Basic dashboard page (`/dashboard`) that:
+  - Shows authenticated user information
+  - Lists user's newsletters (filtered by `Newsletter.userId`, if any exist)
+  - Displays newsletter content in simple text format
+- ✅ Database package (`packages/database/`) with Prisma client (shared package used by all apps)
+
+### Shared Packages
+
+- ✅ `packages/shared/` - Basic types and utilities
+- ✅ Basic logging infrastructure
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 1 - Foundation & Basic Pipeline
+    dateFormat  YYYY-MM-DD
+    section Database & Infrastructure
+    Monorepo setup with Turborepo           :a1, 2026-01-01, 3d
+    PostgreSQL & Prisma setup               :a2, after a1, 2d
+    Database schema design                   :a3, after a2, 3d
+    Database migrations                      :a4, after a3, 2d
+    Redis & BullMQ setup                    :a5, after a1, 2d
+    Environment configuration               :a6, after a1, 1d
+    section Agent Framework
+    Base Agent class                         :b1, after a3, 4d
+    Agent registry system                    :b2, after b1, 2d
+    BullMQ queue system                      :b3, after a5, 3d
+    Event-driven communication               :b4, after b1, 2d
+    section Scheduler Agent
+    Basic scheduler implementation           :c1, after b3, 3d
+    3-stage pipeline (placeholders)          :c2, after c1, 3d
+    Data freshness checks                    :c3, after c2, 1d
+    section Web Application
+    Next.js app setup                        :d1, after a2, 2d
+    NextAuth.js integration                  :d2, after d1, 2d
+    Dashboard page                           :d3, after d2, 3d
+    Database package                         :d4, after a4, 1d
+    section Shared Packages
+    Shared package setup                     :e1, after a1, 2d
+    Logging infrastructure                   :e2, after e1, 2d
+  "
+/>
+
+## Limitations (Acceptable for This Milestone)
+
+- No actual data collection (uses hardcoded data)
+- No analysis stage (skipped in 3-stage pipeline)
+- No quality assurance (skipped in 3-stage pipeline)
+- No email delivery (only saves to database)
+- No personalization (same content for all users)
+- Sequential execution only (no parallelism - processes one user-ticker combination at a time)
+- Basic error handling only (errors logged but no retry logic beyond BullMQ defaults)
+- No job status tracking UI (jobs tracked in Redis/BullMQ only)
+
+## Success Criteria
+
+- ✅ Database schema created and migrations run successfully
+- ✅ Scheduler can be triggered manually and runs the 3-stage pipeline end-to-end
+- ✅ Placeholder agents execute and produce output (each stage completes successfully)
+- ✅ Newsletter is saved to database with correct `userId` association
+- ✅ User can log in via NextAuth.js and see their dashboard
+- ✅ Newsletter appears in user's dashboard (filtered by user, even if content is placeholder)
+- ✅ Data flows correctly between pipeline stages via database (Data Collection → Content Generation → Delivery)
+
+## Next Steps
+
+After this milestone, the system can run end-to-end (with placeholder data). Milestone 2 will replace placeholders with actual functionality.

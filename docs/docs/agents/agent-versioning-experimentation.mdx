@@ -1,0 +1,410 @@
+---
+title: Versioning & Experimentation
+---
+
+## Purpose
+
+Enable project admins to safely experiment with agent configurations, prompts, and strategies without affecting production. Provides a complete workflow from experimental testing to production deployment with validation gates and confidence metrics.
+
+## Overview
+
+The agent versioning and experimentation system allows admins to:
+
+- Create experimental versions of agent configs and prompts
+- Test changes in isolated environments
+- Compare experimental versions against production
+- Validate changes meet quality and performance thresholds
+- Deploy with confidence after validation
+- Rollback instantly if issues arise
+
+## Database Schema
+
+### Core Tables
+
+**`AgentVersion`** - Stores all agent versions with metadata:
+
+```typescript
+{
+  id: string
+  agentId: string                    // Agent identifier (scheduler, query-strategy, etc.)
+  version: string                     // Semantic version (e.g., "1.2.3")
+  config: object                      // Agent configuration snapshot (JSONB)
+  prompts?: object                    // Prompt templates snapshot (JSONB)
+  codeHash: string                    // Hash of agent implementation code
+  createdAt: Date
+  createdBy: string                   // 'learning-agent' | 'admin' | 'manual'
+  metadata: {
+    changelog?: string                // What changed in this version
+    rationale?: string                // Why the change was made
+    expectedImpact?: string           // Expected improvements
+    performanceMetrics?: object        // Historical performance data
+  }
+  status: 'draft' | 'experimental' | 'testing' | 'production' | 'deprecated'
+}
+```
+
+**`AgentVersionDeployment`** - Tracks which version is active in each environment:
+
+```typescript
+{
+  id: string
+  agentId: string
+  versionId: string                   // Reference to AgentVersion
+  environment: 'production' | 'staging' | 'experimental' | 'development'
+  deployedAt: Date
+  deployedBy: string                  // Admin user ID
+  rollbackVersionId?: string          // Previous version for quick rollback
+  deploymentNotes?: string           // Why this version was deployed
+}
+```
+
+### Experimentation Tables
+
+**`AgentExperiment`** - Track experimental runs and comparisons:
+
+```typescript
+{
+  id: string
+  agentId: string
+  versionId: string                   // Experimental version being tested
+  baselineVersionId: string           // Production version to compare against
+  status: 'running' | 'completed' | 'failed'
+  testConfig: {
+    testUsers?: string[]              // Specific users to test with
+    testTickers?: string[]             // Specific tickers to test with
+    testType: 'historical' | 'live' | 'synthetic'
+    sampleSize?: number                // Number of test cases
+    dateRange?: {                      // For historical tests
+      start: Date
+      end: Date
+    }
+  }
+  results: {
+    executionTime: number              // Average execution time (ms)
+    successRate: number                // Success rate (0-1)
+    qualityScore: number               // Quality score (0-1)
+    cost: number                       // API cost in USD
+    errorCount: number
+    sampleOutputs: object[]            // Sample outputs for review
+    metrics: {
+      newsletterGenerated: number
+      averageEngagement?: number
+      userSatisfaction?: number
+    }
+  }
+  comparison: {
+    executionTimeDelta: number         // % change vs baseline
+    successRateDelta: number
+    qualityScoreDelta: number
+    costDelta: number
+    isBetter: boolean                  // Overall assessment
+  }
+  createdAt: Date
+  completedAt?: Date
+  createdBy: string                   // Admin user ID
+  notes?: string
+}
+```
+
+**`AgentValidation`** - Track validation checks before promotion:
+
+```typescript
+{
+  id: string
+  versionId: string
+  validationType: 'performance' | 'quality' | 'cost' | 'error-rate' | 'manual-review'
+  status: 'pending' | 'passed' | 'failed' | 'warning'
+  threshold: number                    // Required threshold
+  actualValue: number                  // Actual measured value
+  passed: boolean
+  message?: string                     // Human-readable result
+  notes?: string
+  validatedBy?: string                 // Admin user ID
+  validatedAt?: Date
+  experimentId?: string               // Link to experiment that generated this validation
+}
+```
+
+**`AgentPromptVersion`** - Track prompt changes separately from config:
+
+```typescript
+{
+  id: string
+  agentId: string
+  promptName: string                   // e.g., 'analysis-prompt', 'content-generation-prompt'
+  version: string
+  prompt: string                       // The actual prompt template
+  config?: object                      // Associated config if any
+  status: 'draft' | 'experimental' | 'testing' | 'production'
+  createdAt: Date
+  createdBy: string
+  metadata: {
+    changes: string                    // What changed
+    rationale: string                  // Why the change was made
+    expectedImpact: string
+    testResults?: object
+  }
+}
+```
+
+## Version Lifecycle
+
+### 1. Version Creation
+
+Versions can be created from multiple sources:
+
+- **Learning Agent**: Automatically creates versions when optimizing configurations
+- **Admin Manual**: Admins create versions via admin dashboard
+- **Experimental Fork**: Create experimental version from existing production version
+
+**Status Flow**:
+
+```
+draft → experimental → testing → production
+                ↓
+          deprecated
+```
+
+### 2. Experimental Phase
+
+- Versions with `status: 'experimental'` are for testing and validation
+- Run in isolated execution context
+- No impact on production users or data
+- Can run test executions on:
+  - Historical data (replay past scenarios)
+  - Test user accounts
+  - Sample tickers
+  - Synthetic test cases
+
+### 3. Testing Phase
+
+- Versions promoted to `status: 'testing'` run alongside production
+- A/B testing on subset of traffic
+- Performance metrics collected for comparison
+- Can be promoted to production or reverted to experimental
+
+### 4. Production Deployment
+
+- Only versions that pass validation can be deployed to production
+- Deployment updates `AgentVersionDeployment` table
+- Previous production version automatically tracked for rollback
+- Agent instances hot-reload with new configuration (no downtime)
+
+### 5. Version Rollback
+
+- Instant rollback to previous production version
+- Updates `AgentVersionDeployment` table only
+- No code deployment required
+- Full audit trail maintained
+
+## Experimentation Workflow
+
+### Creating an Experimental Version
+
+1. **Fork from Production**:
+
+   - Admin selects current production version
+   - Creates experimental copy with `status: 'experimental'`
+   - Can modify configs and prompts in sandbox
+
+2. **Edit Configuration**:
+
+   - Admin edits agent config via admin dashboard
+   - Can edit prompts separately via prompt editor
+   - Changes saved to experimental version only
+   - No impact on production
+
+3. **Run Test Execution**:
+
+   - Admin configures test parameters:
+     - Test users/tickers
+     - Test type (historical/live/synthetic)
+     - Sample size
+   - System runs experimental version on test data
+   - Results stored in `AgentExperiment` table
+
+4. **Review Comparison**:
+   - System compares experimental vs production results
+   - Shows side-by-side metrics:
+     - Execution time
+     - Success rate
+     - Quality scores
+     - Cost impact
+     - Sample outputs
+   - Admin reviews comparison dashboard
+
+### Validation System
+
+Before promoting to production, versions must pass validation gates:
+
+**Automated Validations**:
+
+1. **Performance Validation**:
+
+   - Execution time must not exceed threshold (e.g., +20% vs baseline)
+   - Success rate must meet minimum (e.g., ≥95%)
+
+2. **Quality Validation**:
+
+   - Quality score must meet minimum threshold (e.g., ≥0.8)
+   - Error rate must not exceed threshold (e.g., ≤5%)
+
+3. **Cost Validation**:
+
+   - Cost increase must not exceed budget threshold (e.g., +10%)
+
+4. **Error Rate Validation**:
+   - Error rate must not be higher than baseline
+
+**Manual Validations**:
+
+- Admin review of sample outputs
+- Approval from required reviewers
+- Business logic validation
+
+**Validation Results**:
+
+- All validations must pass for production promotion
+- Warnings can be overridden with admin approval
+- Failed validations block promotion
+- Validation history stored for audit
+
+### Promotion Workflow
+
+1. **Run Validation Suite**:
+
+   - Admin triggers validation from dashboard
+   - System runs all automated checks
+   - Results displayed in validation dashboard
+
+2. **Review Results**:
+
+   - Admin reviews validation results
+   - Can view detailed comparison metrics
+   - Can review sample outputs
+
+3. **Approve Promotion**:
+
+   - If validations pass, admin can promote
+   - Can promote to 'testing' (A/B test) or directly to 'production'
+   - Promotion requires confirmation
+   - Audit log entry created
+
+4. **Deployment**:
+   - System updates `AgentVersionDeployment` table
+   - Agent instances hot-reload configuration
+   - Previous version tracked for rollback
+   - Monitoring alerts configured
+
+## Admin Dashboard Features
+
+### Experimental Workspace (`/admin/agents/experiments`)
+
+- **Version Browser**: View all versions for each agent
+- **Create Experimental**: Fork production version to experimental
+- **Config Editor**: Edit agent configurations in sandbox
+- **Prompt Editor**: Edit prompts with syntax highlighting and version control
+- **Test Runner**: Configure and run test executions
+- **Comparison Dashboard**: Side-by-side comparison of versions
+- **Validation Suite**: Run and view validation results
+- **Promotion Controls**: Promote versions with validation gates
+
+### Version Validator (`/admin/agents/versions/[id]/validate`)
+
+- **Validation Dashboard**: View all validation checks
+- **Run Validations**: Trigger validation suite
+- **Threshold Configuration**: Configure validation thresholds per agent
+- **Override Controls**: Override warnings with approval workflow
+- **History**: View validation history for version
+
+### Prompt Management (`/admin/agents/prompts`)
+
+- **Prompt Library**: View all prompts for each agent
+- **Version Control**: Track prompt changes over time
+- **Test Prompts**: Test prompts with sample inputs
+- **Compare Outputs**: Side-by-side comparison of prompt outputs
+- **Promote Prompts**: Promote prompts independently of configs
+
+### Version Comparison (`/admin/agents/versions/compare`)
+
+- **Side-by-Side View**: Compare any two versions
+- **Metrics Comparison**: Execution time, success rate, quality, cost
+- **Output Comparison**: Sample outputs from each version
+- **Diff View**: Configuration and prompt differences
+- **Performance Charts**: Visual comparison of metrics over time
+
+## Workflow Examples
+
+### Example 1: Testing a New Prompt
+
+1. Admin navigates to `/admin/agents/prompts`
+2. Selects "Content Generation Agent" → "main-prompt"
+3. Creates experimental version of prompt
+4. Edits prompt with new instructions
+5. Tests prompt with sample input
+6. Reviews output quality
+7. Creates experimental agent version that uses new prompt
+8. Runs test execution on sample newsletters
+9. Compares results with production version
+10. Runs validation suite
+11. If validations pass, promotes to testing (A/B test)
+12. After sufficient data, promotes to production
+
+### Example 2: Optimizing Agent Configuration
+
+1. Admin navigates to `/admin/agents/experiments`
+2. Selects "Query Strategy Agent"
+3. Creates experimental version from current production
+4. Edits configuration (e.g., changes entity discovery settings)
+5. Saves experimental version
+6. Runs test execution on historical data (last 30 days)
+7. Reviews comparison dashboard:
+   - Execution time: -15% (improved)
+   - Success rate: 98% (same)
+   - Quality score: 0.85 (improved from 0.82)
+   - Cost: +5% (acceptable)
+8. Runs validation suite - all checks pass
+9. Promotes to testing status for A/B test
+10. Monitors A/B test results for 1 week
+11. Confirms improvements, promotes to production
+
+### Example 3: Quick Rollback
+
+1. New production version deployed
+2. Monitoring alerts show increased error rate
+3. Admin navigates to `/admin/agents/versions`
+4. Views current production version
+5. Clicks "Rollback" button
+6. Confirms rollback to previous version
+7. System updates `AgentVersionDeployment` table
+8. Agents hot-reload previous configuration
+9. Error rate returns to normal
+10. Admin investigates issue in experimental environment
+
+## Best Practices
+
+1. **Always Test First**: Never deploy directly to production without testing
+2. **Use Historical Tests**: Test on historical data to validate behavior
+3. **Set Appropriate Thresholds**: Configure validation thresholds based on business requirements
+4. **Monitor A/B Tests**: Use testing phase to gather real-world metrics
+5. **Document Changes**: Always include rationale and expected impact in version metadata
+6. **Review Sample Outputs**: Manually review sample outputs before promotion
+7. **Gradual Rollout**: Consider promoting to testing before production
+8. **Keep Rollback Ready**: Always know which version to rollback to
+9. **Track Metrics**: Monitor version performance after deployment
+10. **Audit Trail**: All changes are logged for compliance and debugging
+
+## Integration with Learning Agent
+
+The Learning Agent can create optimized versions automatically:
+
+1. Learning Agent analyzes metrics and identifies optimizations
+2. Creates new agent version with optimized configuration
+3. Version starts as 'draft' status
+4. Admin reviews optimization rationale in metadata
+5. Admin can promote to experimental for testing
+6. After validation, admin promotes to production
+7. Learning Agent tracks performance of new version
+8. Cycle continues with continuous improvement
+
+This integration ensures that automated optimizations go through the same validation process as manual changes, maintaining quality and safety.

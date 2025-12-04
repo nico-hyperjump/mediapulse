@@ -1,0 +1,89 @@
+---
+title: Milestone 5 - Query Strategy (Basic)
+---
+
+## Summary
+
+Implement basic query strategy to discover entities and generate better search queries.
+
+## Timeline
+
+Weeks 11-12
+
+## Goal
+
+Add entity discovery and intelligent query generation to improve data collection quality.
+
+## Deliverables
+
+### Query Strategy Agent (Basic)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule:
+    - Entity Refresh: Weekly (configurable per ticker) - updates basic entity list
+    - Query Generation: On-demand or when entity list updates
+  - Operates independently - Data Collection Agent reads queries from database
+- ✅ **Basic Entity Discovery**:
+  - Company name extraction from ticker
+  - Simple competitor identification (hardcoded list or basic API)
+  - No entity relationship graph yet (simple flat entity storage only)
+- ✅ **Query Generation**:
+  - Generate queries from ticker + basic entities
+  - Multiple query variants (5+ per ticker)
+  - Query prioritization (simple scoring based on entity relevance)
+- ✅ **Database Integration**:
+  - Store queries in database (available for Data Collection Agent)
+  - Store discovered entities in database (simple flat structure, not a graph)
+  - Link entities to tickers
+  - Data Collection Agent reads latest queries from database (replaces hardcoded queries from Milestone 3)
+
+### Data Collection Agent (Enhanced)
+
+- ✅ Replace hardcoded queries from Milestone 3 with queries from Query Strategy Agent
+- ✅ Execute multiple queries per ticker (reads from database)
+- ✅ Merge results from different queries
+- ✅ Basic query performance tracking (tracks which queries return results, stores feedback for future optimization)
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 5 - Query Strategy (Basic)
+    dateFormat  YYYY-MM-DD
+    section Query Strategy Agent
+    Independent scheduling setup             :a1, 2026-03-12, 2d
+    Company name extraction                 :a2, after a1, 1d
+    Competitor identification               :a3, after a2, 2d
+    Query generation logic                  :a4, after a3, 2d
+    Query prioritization                    :a5, after a4, 1d
+    Database schema for queries             :a6, 2026-03-12, 1d
+    Entity storage structure (flat)         :a7, after a6, 1d
+    Query storage & retrieval               :a8, after a7, 1d
+    section Data Collection Agent
+    Query reading from database              :b1, after a8, 1d
+    Multiple query execution                :b2, after b1, 2d
+    Result merging                          :b3, after b2, 1d
+    Query performance tracking              :b4, after b3, 1d
+  "
+/>
+
+## Limitations (Acceptable for This Milestone)
+
+- Simple entity discovery (no SEC filings parsing yet)
+- Hardcoded competitor lists or basic API
+- No entity relationship graph (simple flat entity storage only)
+- No query optimization based on historical performance (only basic performance tracking for future use)
+- Basic query generation only (no AI-enhanced query variants yet)
+
+## Success Criteria
+
+- ✅ Query Strategy Agent discovers basic entities for test tickers
+- ✅ Generates 5+ relevant queries per ticker
+- ✅ Data collection uses queries and collects more relevant data
+- ✅ Newsletter quality improves (more relevant articles)
+- ✅ Entities are stored and can be retrieved
+
+## Next Steps
+
+After this milestone, data collection is more intelligent. Milestone 6 will add more data sources and better deduplication.

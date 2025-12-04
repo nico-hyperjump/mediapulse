@@ -1,0 +1,122 @@
+---
+title: Milestone 12 - Learning Agent (Basic)
+---
+
+## Summary
+
+Implement basic learning agent to collect metrics and provide optimization recommendations.
+
+## Timeline
+
+Weeks 25-26
+
+## Goal
+
+Add metrics collection and basic optimization capabilities.
+
+## Deliverables
+
+### Learning Agent (Basic)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule: Daily at midnight
+  - Operates independently - analyzes all metrics from previous day
+- ✅ **Metrics Collection**:
+  - Engagement metrics (opens, clicks, time spent)
+  - User feedback collection (ratings, comments)
+  - **Section-level feedback analysis** (analyzes feedback collected in Milestone 9 - Like/Dislike, Useful/Irrelevant per section)
+  - Newsletter performance tracking
+  - Agent performance metrics
+- ✅ **Basic Analysis**:
+  - Engagement rate calculations
+  - Trend detection
+  - Top/low performing content identification
+  - **Section feedback analysis** (analyzes feedback data collected in Milestone 9):
+    - Identify sections with high/low feedback scores
+    - Correlate feedback with content types and topics
+    - Track feedback trends over time
+- ✅ **Optimization Recommendations**:
+  - Basic config optimization suggestions
+  - Simple A/B test analysis
+  - Performance improvement recommendations
+  - Updates agent configs in database (hot-reloadable)
+
+### Database Updates
+
+- ✅ User feedback table (if not exists)
+- ✅ Section feedback analytics views (aggregates section-level feedback)
+- ✅ Agent metrics table (if not exists)
+- ✅ Engagement tracking
+
+### Web Dashboard Updates
+
+- ✅ Feedback collection UI (ratings, comments)
+- ✅ Basic analytics dashboard
+- ✅ Section feedback analytics visualization
+- ✅ Admin metrics view
+
+### Delivery Agent (Update)
+
+- ✅ Email tracking (open tracking, click tracking)
+- ✅ Engagement metrics collection
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 12 - Learning Agent (Basic)
+    dateFormat  YYYY-MM-DD
+    section Learning Agent
+    Independent scheduling setup             :la1, 2026-06-18, 1d
+    Engagement metrics collection            :la2, 2026-06-19, 2d
+    User feedback collection                :la3, 2026-06-21, 1d
+    Section level feedback collection        :la4, 2026-06-22, 1d
+    Newsletter performance tracking          :la5, 2026-06-23, 1d
+    Agent performance metrics                :la6, 2026-06-24, 1d
+    Engagement rate calculations            :la7, 2026-06-21, 1d
+    Trend detection                         :la8, 2026-06-22, 1d
+    Top low performing content              :la9, 2026-06-23, 1d
+    Section feedback analysis               :la10, 2026-06-23, 2d
+    Feedback correlation                    :la11, 2026-06-25, 1d
+    Feedback trend tracking                 :la12, 2026-06-26, 1d
+    Config optimization suggestions         :la13, 2026-06-25, 2d
+    AB test analysis                        :la14, 2026-06-27, 1d
+    Performance recommendations             :la15, 2026-06-28, 1d
+    Config hot reload updates               :la16, 2026-06-29, 1d
+    section Database
+    User feedback table                     :db1, 2026-06-18, 1d
+    Section feedback analytics views        :db2, 2026-06-19, 1d
+    Agent metrics table                     :db3, 2026-06-20, 1d
+    Engagement tracking tables              :db4, 2026-06-21, 1d
+    section Web Dashboard
+    Feedback collection UI                  :wd1, 2026-06-19, 2d
+    Basic analytics dashboard               :wd2, 2026-06-22, 2d
+    Section feedback visualization          :wd3, 2026-06-20, 2d
+    Admin metrics view                      :wd4, 2026-06-21, 2d
+    section Delivery Agent
+    Email open tracking                     :del1, 2026-06-18, 1d
+    Email click tracking                    :del2, 2026-06-19, 1d
+    Engagement metrics collection           :del3, 2026-06-20, 1d
+  "
+/>
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic metrics only (no advanced analytics)
+- Simple recommendations (no automated updates)
+- No statistical significance testing for A/B tests
+- Manual review of recommendations
+
+## Success Criteria
+
+- ✅ Collects engagement metrics accurately
+- ✅ Tracks user feedback (including section-level feedback)
+- ✅ Analyzes section feedback patterns
+- ✅ Generates basic optimization recommendations
+- ✅ A/B test results are tracked
+- ✅ Metrics dashboard displays data correctly
+
+## Next Steps
+
+After this milestone, system collects metrics. Milestone 13 will focus on production hardening.
