@@ -1,0 +1,67 @@
+---
+title: Milestone 8 - Quality Assurance (Basic)
+---
+
+## Summary
+
+Add basic quality assurance to validate newsletters before delivery.
+
+## Timeline
+
+Weeks 17-18
+
+## Goal
+
+Implement basic quality checks and compliance validation to ensure newsletter quality.
+
+## Deliverables
+
+### Quality Assurance Agent (Basic)
+
+- ✅ **Basic Quality Checks**:
+  - Content completeness (required sections present)
+  - Length validation (not too short/long)
+  - Basic grammar/spelling check (using AI)
+  - Consistency check (no obvious contradictions)
+- ✅ **Compliance Checking**:
+  - Disclaimer verification (required disclaimers present)
+  - Financial advice language detection
+  - Data attribution verification
+- ✅ **Approval Workflow**:
+  - Pass/fail decision logic
+  - Auto-approval for high-quality content
+  - Flag for manual review if issues found
+- ✅ **Integration with Pipeline**:
+  - QA runs after content generation
+  - Can request revision from Content Generation Agent
+  - Blocks delivery if not approved
+
+### Content Generation Agent (Minor Update)
+
+- ✅ Handle revision requests from QA
+- ✅ Improve content based on QA feedback
+
+### Scheduler Agent (Update)
+
+- ✅ Include QA stage in pipeline
+- ✅ Handle QA approval/rejection flow
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic fact-checking only (no cross-referencing with sources)
+- Simple quality checks (no advanced validation)
+- No automated fix suggestions
+- Manual review for complex issues
+
+## Success Criteria
+
+- ✅ QA Agent validates newsletter content
+- ✅ Catches obvious quality issues
+- ✅ Compliance checks work correctly
+- ✅ Approval workflow functions properly
+- ✅ Revision requests improve content quality
+- ✅ Low-quality content is blocked from delivery
+
+## Next Steps
+
+After this milestone, newsletters are validated before delivery. Milestone 9 will add personalization and A/B testing to content generation.

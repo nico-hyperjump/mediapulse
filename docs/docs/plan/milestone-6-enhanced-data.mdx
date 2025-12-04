@@ -1,0 +1,103 @@
+---
+title: Milestone 6 - Enhanced Data Collection
+---
+
+## Summary
+
+Add multiple data sources, improve deduplication, and add relevance scoring.
+
+## Timeline
+
+Weeks 13-14
+
+## Goal
+
+Expand data collection to multiple sources and improve data quality through better deduplication and relevance scoring.
+
+## Deliverables
+
+### Data Collection Agent (Enhanced)
+
+- ✅ **Independent Scheduling** (Maintained):
+  - Continues running independently every 1-4 hours (configurable per ticker)
+  - High-priority tickers: Every 1 hour
+  - Low-priority tickers: Every 6-12 hours
+  - Reads latest queries from database (from Query Strategy Agent)
+- ✅ **Additional News Sources**:
+  - Google News API integration
+  - RSS feed parsing (if available)
+  - At least 2-3 news sources total
+- ✅ **Social Media Integration** (Basic):
+  - Twitter/X API integration (v2) - basic search
+  - Simple post collection (10-20 posts per ticker)
+- ✅ **Improved Deduplication**:
+  - AI-powered content similarity (for near-duplicates)
+  - Title similarity with fuzzy matching
+  - URL normalization
+- ✅ **Relevance Scoring**:
+  - AI-powered relevance scoring
+  - Filter low-relevance content (threshold-based)
+  - Score-based prioritization
+- ✅ **Source Management**:
+  - Source health monitoring
+  - Graceful degradation when sources fail
+  - Source-specific rate limiting
+
+### Query Strategy Agent (Minor Enhancement)
+
+- ✅ Better query optimization:
+  - Track query performance
+  - Prioritize high-performing queries
+
+### Agent Versioning System (Basic)
+
+- ✅ **Version Creation and Tracking**:
+  - Agent version tables in database
+  - Version creation for agent configs and prompts
+  - Version metadata (changelog, rationale, expected impact)
+  - Version status tracking (draft, experimental, testing, production, deprecated)
+- ✅ **Basic Experimentation**:
+  - Create experimental versions from production
+  - Run test executions on experimental versions
+  - Compare experimental vs production performance
+  - Basic validation checks before promotion
+- ✅ **Deployment System**:
+  - Version deployment tracking
+  - Rollback capability to previous production version
+  - Hot-reload configuration (no downtime)
+- ✅ **Admin Dashboard**:
+  - Basic version management UI
+  - Version comparison tools
+  - Deployment controls
+  - Simple validation dashboard
+
+### Database Updates
+
+- ✅ Agent version tables (`AgentVersion`, `AgentVersionDeployment`)
+- ✅ Basic experimentation tables (`AgentExperiment`, `AgentValidation`)
+- ✅ Version tracking in agent configs
+
+## Limitations (Acceptable for This Milestone)
+
+- Limited social media data (Twitter only, basic search)
+- No earnings calls or SEC filings yet
+- Basic relevance scoring
+- No advanced data enrichment
+- Basic versioning (no advanced analytics or automated optimization)
+- Manual version promotion (no automated promotion workflows)
+
+## Success Criteria
+
+- ✅ Collects data from 3+ sources
+- ✅ Collects 50+ news articles per ticker per day
+- ✅ Collects 20+ social media posts per ticker per day
+- ✅ Deduplication removes 80%+ of duplicates
+- ✅ Relevance scoring filters low-quality content effectively
+- ✅ System handles multiple sources gracefully
+- ✅ Agent versioning system works correctly
+- ✅ Admins can create and test experimental versions
+- ✅ Version comparison and rollback function properly
+
+## Next Steps
+
+After this milestone, data collection is robust with multiple sources and agent versioning enables safe iteration on improvements. Milestone 7 will add comprehensive analysis (fundamental, competitive, advanced technical).

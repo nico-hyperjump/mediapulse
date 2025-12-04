@@ -1,0 +1,81 @@
+---
+title: Milestone 4 - Basic Analysis & Enhanced Content
+---
+
+## Summary
+
+Add basic analysis capabilities and improve content generation with insights.
+
+## Timeline
+
+Weeks 9-10
+
+## Goal
+
+Add simple analysis (sentiment and basic technical) and enhance content generation to include insights.
+
+## Deliverables
+
+### Analysis Agent (Minimal)
+
+- ✅ **Sentiment Analysis**:
+  - AI-powered sentiment analysis of news articles
+  - Aggregate sentiment score (positive/negative/neutral)
+  - Simple sentiment trend (improving/declining/stable)
+- ✅ **Basic Technical Analysis**:
+  - Price change calculation
+  - Simple moving average (if historical data available)
+  - Volume analysis (high/normal/low)
+- ✅ Analysis result storage:
+  - Store analysis results in database
+  - Link to source data
+- ✅ Simple insight extraction:
+  - Identify top 3 insights from analysis
+  - Priority scoring (basic)
+
+### Content Generation Agent (Enhanced)
+
+- ✅ Enhanced newsletter structure:
+  - Executive summary with sentiment
+  - Key insights section (from analysis)
+  - News summary with sentiment indicators
+  - Market data with technical indicators
+- ✅ Improved prompts:
+  - Include analysis results in prompts
+  - Generate actionable insights
+- ✅ Better formatting:
+  - Structured sections
+  - Improved HTML template (basic styling)
+
+### Database Updates
+
+- ✅ Add analysis result storage (if not already in schema)
+- ✅ Link analysis to newsletters
+
+### Scheduler Agent (Update)
+
+- ✅ Newsletter pipeline enhancements:
+  - Checks data freshness before triggering analysis
+  - Can trigger immediate data collection if data is stale (< 4 hours old)
+  - Triggers Analysis Agent after data freshness check
+
+## Limitations (Acceptable for This Milestone)
+
+- Only sentiment and basic technical analysis
+- No fundamental analysis
+- No competitive analysis
+- Simple insight extraction
+- No advanced technical indicators
+
+## Success Criteria
+
+- ✅ Analysis agent processes collected data
+- ✅ Sentiment scores are calculated and stored
+- ✅ Basic technical indicators are calculated
+- ✅ Content generation includes analysis insights
+- ✅ Newsletters show sentiment and basic technical data
+- ✅ Insights are relevant and actionable
+
+## Next Steps
+
+After this milestone, newsletters include basic analysis. Milestone 5 will add query strategy to improve data collection quality and discover entities.

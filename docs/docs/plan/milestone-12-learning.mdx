@@ -1,0 +1,82 @@
+---
+title: Milestone 12 - Learning Agent (Basic)
+---
+
+## Summary
+
+Implement basic learning agent to collect metrics and provide optimization recommendations.
+
+## Timeline
+
+Weeks 25-26
+
+## Goal
+
+Add metrics collection and basic optimization capabilities.
+
+## Deliverables
+
+### Learning Agent (Basic)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule: Daily at midnight
+  - Operates independently - analyzes all metrics from previous day
+- ✅ **Metrics Collection**:
+  - Engagement metrics (opens, clicks, time spent)
+  - User feedback collection (ratings, comments)
+  - **Section-level feedback** (Like/Dislike, Useful/Irrelevant per section)
+  - Newsletter performance tracking
+  - Agent performance metrics
+- ✅ **Basic Analysis**:
+  - Engagement rate calculations
+  - Trend detection
+  - Top/low performing content identification
+  - **Section feedback analysis**:
+    - Identify sections with high/low feedback scores
+    - Correlate feedback with content types and topics
+    - Track feedback trends over time
+- ✅ **Optimization Recommendations**:
+  - Basic config optimization suggestions
+  - Simple A/B test analysis
+  - Performance improvement recommendations
+  - Updates agent configs in database (hot-reloadable)
+
+### Database Updates
+
+- ✅ User feedback table (if not exists)
+- ✅ Section feedback analytics views (aggregates section-level feedback)
+- ✅ Agent metrics table (if not exists)
+- ✅ Engagement tracking
+
+### Web Dashboard Updates
+
+- ✅ Feedback collection UI (ratings, comments)
+- ✅ Basic analytics dashboard
+- ✅ Section feedback analytics visualization
+- ✅ Admin metrics view
+
+### Delivery Agent (Update)
+
+- ✅ Email tracking (open tracking, click tracking)
+- ✅ Engagement metrics collection
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic metrics only (no advanced analytics)
+- Simple recommendations (no automated updates)
+- No statistical significance testing for A/B tests
+- Manual review of recommendations
+
+## Success Criteria
+
+- ✅ Collects engagement metrics accurately
+- ✅ Tracks user feedback (including section-level feedback)
+- ✅ Analyzes section feedback patterns
+- ✅ Generates basic optimization recommendations
+- ✅ A/B test results are tracked
+- ✅ Metrics dashboard displays data correctly
+
+## Next Steps
+
+After this milestone, system collects metrics. Milestone 13 will focus on production hardening.
+

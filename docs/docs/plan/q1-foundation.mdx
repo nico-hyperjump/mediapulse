@@ -1,0 +1,134 @@
+---
+title: Q1 - Foundation & Core
+---
+
+## Milestone 1.1
+
+### Summary
+
+Project Setup & Database Foundation
+
+### Timeline
+
+Weeks 1-4
+
+### Goal
+
+Establish the technical foundation and database schema for the entire system.
+
+### Deliverables
+
+- ✅ Monorepo structure with Turborepo configured
+- ✅ PostgreSQL database with Prisma ORM setup
+- ✅ Complete database schema implementation:
+  - User, Ticker, UserTicker models
+  - DataSource model for collected data
+  - Newsletter and NewsletterContent models
+  - UserFeedback and AgentMetrics models
+  - ABTest model
+  - Configuration tables: AgentConfig, SourceConfig, UserPreferences, SystemConfig, ABTestConfig
+- ✅ Database migrations and seed scripts
+- ✅ Redis setup for BullMQ queue system
+- ✅ Environment variable management and configuration
+- ✅ Basic CI/CD pipeline setup
+- ✅ Development environment documentation
+
+### Success Criteria
+
+- All database models created and tested
+- Migration system working
+- Local development environment fully functional
+- CI/CD pipeline runs successfully
+
+---
+
+## Milestone 1.2
+
+### Summary
+
+Core Agent Framework & Configuration System
+
+### Timeline
+
+Weeks 5-8
+
+### Goal
+
+Build the foundational agent architecture and dynamic configuration management system.
+
+### Deliverables
+
+- ✅ Base Agent class with common functionality (error handling, retries, logging)
+- ✅ Configuration management system:
+  - Database-driven config loading
+  - Config caching with TTL
+  - Hot-reload API endpoint
+  - Config versioning and rollback
+  - Configuration hierarchy resolution (user → ticker → agent → system)
+  - Zod schema validation for all configs
+- ✅ Agent registry and execution framework
+- ✅ Job queue system with BullMQ:
+  - Queue setup and configuration
+  - Job types and priorities
+  - Retry mechanisms with exponential backoff
+  - Job monitoring and status tracking
+- ✅ Scheduler Agent implementation:
+  - Pipeline orchestration (data collection → analysis → content generation → QA → delivery)
+  - Cron-based and interval-based scheduling
+  - Job creation and prioritization per user-ticker combination
+  - Parallel execution management (parallel data collection/analysis, sequential content generation per user)
+  - Stage-level error handling and retries
+  - Pipeline metrics collection and reporting
+- ✅ Shared types package (`packages/shared/`)
+- ✅ Logging and monitoring infrastructure
+- ✅ Unit tests for agent framework (80%+ coverage)
+
+### Success Criteria
+
+- Agents can be instantiated and configured from database
+- Configuration changes apply without code deployment
+- Job queue processes jobs successfully
+- Scheduler Agent can orchestrate multi-stage pipeline execution
+- Scheduler Agent handles parallel and sequential execution correctly
+- All framework code has comprehensive test coverage
+
+---
+
+## Milestone 1.3
+
+### Summary
+
+Build the core Next.js web application with authentication and basic UI.
+
+### Timeline
+
+Weeks 9-12
+
+### Goal
+
+Build the core Next.js web application with authentication and basic UI.
+
+- ✅ Next.js 16+ App Router application (`apps/web/`)
+- ✅ NextAuth.js authentication setup:
+  - Email/password authentication
+  - OAuth providers (Google, GitHub)
+  - Session management
+  - Protected routes
+- ✅ Core dashboard pages:
+  - `/dashboard` - Overview page with layout
+  - `/auth/login` and `/auth/signup` pages
+  - `/settings` - User preferences page (UI only)
+- ✅ Database package (`packages/database/`) with Prisma client exports
+- ✅ UI component library foundation:
+  - Design system setup (Tailwind CSS or similar)
+  - Reusable components (Button, Card, Input, etc.)
+  - Responsive layout components
+- ✅ API route structure for future endpoints
+- ✅ Basic error handling and loading states
+
+### Success Criteria
+
+- Users can sign up, log in, and access dashboard
+- Dashboard displays basic user information
+- All pages are responsive and accessible
+- Authentication flow works end-to-end

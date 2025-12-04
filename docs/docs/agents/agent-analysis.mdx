@@ -1,0 +1,186 @@
+---
+title: Analysis Agent
+---
+
+## Purpose
+
+Analyze collected data to generate insights: technical analysis, fundamental analysis, competitive landscape, and sentiment.
+
+## Inputs
+
+- `ticker: string` - Stock symbol
+- `collectedData: DataCollectionOutput` - Output from Data Collection Agent
+- `analysisTypes: ('technical' | 'fundamental' | 'competitive' | 'sentiment')[]` - Which analyses to perform
+- `userPreferences: { focusAreas: string[], riskTolerance: string }` - Optional user context
+
+## Configurations
+
+```typescript
+{
+  technical: {
+    indicators: ['RSI', 'MACD', 'SMA', 'EMA', 'BollingerBands'],
+    timeframes: ['1D', '1W', '1M', '3M'],
+    supportResistanceLevels: true,
+    trendAnalysis: true
+  },
+  fundamental: {
+    metrics: ['P/E', 'P/B', 'ROE', 'ROA', 'Debt/Equity', 'Revenue Growth'],
+    compareToPeers: true,
+    industryBenchmark: true,
+    forwardLooking: true
+  },
+  competitive: {
+    peerGroupSize: 5,
+    comparisonMetrics: ['marketCap', 'revenue', 'profitMargin', 'growth'],
+    industryTrends: true,
+    marketShare: true
+  },
+  sentiment: {
+    model: 'gpt-4',
+    sources: ['news', 'social', 'analyst'],
+    aggregation: 'weighted_average',
+    timeDecay: true
+  },
+  ai: {
+    model: 'gpt-4',
+    temperature: 0.3,
+    maxTokens: 2000
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'analysis',
+  ticker: string,
+  timestamp: Date,
+  executionTime: number,
+  analyses: {
+    technical: {
+      trend: 'bullish' | 'bearish' | 'neutral',
+      currentPrice: number,
+      supportLevels: number[],
+      resistanceLevels: number[],
+      indicators: {
+        rsi: { value: number, signal: 'overbought' | 'oversold' | 'neutral' },
+        macd: { signal: 'buy' | 'sell' | 'hold', strength: number },
+        movingAverages: { sma50: number, sma200: number, relationship: string }
+      },
+      summary: string,
+      confidence: number
+    },
+    fundamental: {
+      currentMetrics: {
+        pe: number,
+        pb: number,
+        roe: number,
+        debtToEquity: number,
+        revenueGrowth: number
+      },
+      vsPeers: {
+        peRank: number,
+        growthRank: number,
+        overallRank: number
+      },
+      valuation: 'undervalued' | 'fair' | 'overvalued',
+      summary: string,
+      confidence: number
+    },
+    competitive: {
+      marketPosition: string,
+      peerComparison: Array<{
+        ticker: string,
+        metric: string,
+        value: number,
+        rank: number
+      }>,
+      industryTrends: Array<{ trend: string, impact: 'positive' | 'negative' | 'neutral' }>,
+      summary: string
+    },
+    sentiment: {
+      overall: number, // -1 to 1
+      breakdown: {
+        news: number,
+        social: number,
+        analyst: number
+      },
+      trend: 'improving' | 'declining' | 'stable',
+      keyDrivers: Array<{ source: string, impact: number, description: string }>,
+      summary: string
+    }
+  },
+  insights: Array<{
+    type: 'technical' | 'fundamental' | 'competitive' | 'sentiment',
+    priority: 'high' | 'medium' | 'low',
+    title: string,
+    description: string,
+    dataPoints: string[]
+  }>,
+  metadata: {
+    dataQuality: number,
+    analysisConfidence: number
+  }
+}
+```
+
+## Process
+
+1. **Initialize**: Load analysis config, validate inputs
+2. **Technical Analysis**:
+
+   - Calculate technical indicators from price history
+   - Identify support/resistance levels
+   - Determine trend direction and strength
+   - Generate technical summary using AI
+
+3. **Fundamental Analysis**:
+
+   - Extract financial metrics from earnings data
+   - Compare to industry peers (fetch peer data if needed)
+   - Calculate valuation ratios
+   - Assess financial health
+   - Generate fundamental summary using AI
+
+4. **Competitive Analysis**:
+
+   - Identify peer group (same industry/sector)
+   - Fetch peer metrics
+   - Compare key metrics (revenue, profit, growth)
+   - Analyze industry trends
+   - Generate competitive summary using AI
+
+5. **Sentiment Analysis**:
+
+   - Aggregate sentiment from news articles (AI analysis)
+   - Analyze social media sentiment (AI + keyword analysis)
+   - Consider analyst ratings if available
+   - Weight by source credibility and recency
+   - Generate sentiment summary
+
+6. **Insight Extraction**: Use AI to identify top insights across all analyses
+7. **Return**: Structured analysis results
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler] --> B[Analysis Agent]
+    B --> C[Agent receives collectedData from Data Collection]
+    C --> D[Parallel Analysis 4 workers]
+    
+    D --> E1[Technical Analyzer<br/>Calculate indicators<br/>Identify support/resistance<br/>AI: Generate summary]
+    D --> E2[Fundamental Analyzer<br/>Extract metrics<br/>Fetch peer data<br/>Compare & evaluate<br/>AI: Generate summary]
+    D --> E3[Competitive Analyzer<br/>Identify peers<br/>Compare metrics<br/>Analyze industry trends<br/>AI: Generate summary]
+    D --> E4[Sentiment Analyzer<br/>Analyze news sentiment AI<br/>Analyze social sentiment AI<br/>Aggregate & weight<br/>AI: Generate summary]
+    
+    E1 --> F[AI: Extract top insights across analyses]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    
+    F --> G[Return structured analysis results]
+"
+/>

@@ -1,0 +1,99 @@
+---
+title: Milestone 1 - Foundation & Basic Pipeline
+---
+
+## Summary
+
+Establish the technical foundation and build the minimal agent framework to support the pipeline.
+
+## Timeline
+
+Weeks 1-4
+
+## Goal
+
+Create the database foundation, basic agent framework, and minimal scheduler that can orchestrate a simple pipeline.
+
+## Deliverables
+
+### Database & Infrastructure
+
+- ✅ Monorepo structure with Turborepo configured
+- ✅ PostgreSQL database with Prisma ORM setup
+- ✅ **Minimal database schema** (only essential tables):
+  - `User` - Basic user information
+  - `Ticker` - Stock symbols
+  - `UserTicker` - User-ticker subscriptions
+  - `Newsletter` - Generated newsletters
+  - `NewsletterContent` - Newsletter content (simple text field)
+  - `AgentConfig` - Basic configuration storage
+- ✅ Database migrations and seed scripts
+- ✅ Redis setup for BullMQ queue system
+- ✅ Environment variable management
+
+### Agent Framework (Minimal)
+
+- ✅ Base Agent class with:
+  - Error handling
+  - Basic logging
+  - Configuration loading from database
+  - Independent scheduling support (each agent can have its own schedule)
+- ✅ Agent registry system
+- ✅ Job queue system with BullMQ:
+  - Basic queue setup
+  - Job creation and processing
+  - Simple retry mechanism
+  - Support for independent agent scheduling
+- ✅ Event-driven communication foundation:
+  - Agents communicate through shared database (not direct calls)
+  - Data timestamping for freshness tracking
+
+### Scheduler Agent (Minimal)
+
+- ✅ Basic scheduler that can:
+  - Run on a schedule (cron or interval) - default daily at 6 AM
+  - Create jobs for user-ticker combinations
+  - Execute a simple 3-stage newsletter pipeline:
+    1. Data Collection (placeholder - returns hardcoded data)
+    2. Content Generation (placeholder - generates simple text)
+    3. Delivery (placeholder - saves to database only)
+  - Check data freshness before processing (basic check)
+- ✅ Sequential execution (no parallelism yet)
+- ✅ Basic error handling
+
+### Web Application (Minimal)
+
+- ✅ Next.js 16+ App Router application (`apps/web/`)
+- ✅ NextAuth.js authentication (email/password only)
+- ✅ Basic dashboard page (`/dashboard`) that:
+  - Shows user information
+  - Lists newsletters (if any exist)
+- ✅ Database package (`packages/database/`) with Prisma client
+
+### Shared Packages
+
+- ✅ `packages/shared/` - Basic types and utilities
+- ✅ Basic logging infrastructure
+
+## Limitations (Acceptable for This Milestone)
+
+- No actual data collection (uses hardcoded data)
+- No analysis (skipped)
+- No quality assurance (skipped)
+- No email delivery (only saves to database)
+- No personalization
+- Sequential execution only (no parallelism)
+- Basic error handling only
+
+## Success Criteria
+
+- ✅ Database schema created and migrations run successfully
+- ✅ Scheduler can be triggered manually and runs the 3-stage pipeline
+- ✅ Placeholder agents execute and produce output
+- ✅ Newsletter is saved to database
+- ✅ User can log in and see their dashboard
+- ✅ Newsletter appears in dashboard (even if content is placeholder)
+
+## Next Steps
+
+After this milestone, the system can run end-to-end (with placeholder data). Milestone 2 will replace placeholders with actual functionality.

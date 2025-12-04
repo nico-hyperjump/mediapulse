@@ -1,0 +1,104 @@
+---
+title: Architecture
+---
+
+The project consists of multiple apps, agents, and packages.
+
+## Project Structure
+
+```
+stock-newsletter/
+├── apps/
+│   ├── web/                    # Next.js user dashboard
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── dashboard/
+│   │   │   ├── newsletters/
+│   │   │   └── api/
+│   │   └── components/
+│   ├── admin/                  # Next.js admin dashboard
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── dashboard/
+│   │   │   ├── agents/
+│   │   │   ├── versions/
+│   │   │   ├── config/
+│   │   │   ├── users/
+│   │   │   ├── monitoring/
+│   │   │   └── api/
+│   │   └── components/
+│   └── worker/                  # Background job processor
+│       └── agents/
+│           ├── scheduler/
+│           ├── query-strategy/
+│           ├── data-collection/
+│           ├── analysis/
+│           ├── content-generation/
+│           ├── quality-assurance/
+│           ├── delivery/
+│           └── learning/
+├── packages/
+│   ├── shared/                  # Shared types and utilities
+│   ├── database/                # Prisma schema and migrations
+│   ├── agents/                  # Agent implementations
+│   ├── ai/                      # AI/LLM integration layer
+│   └── email/                   # Email templates and sending
+├── prisma/
+│   └── schema.prisma
+└── package.json                 # Turborepo monorepo config
+```
+
+## Database Schema
+
+Key entities:
+
+- `User` - Recipients with preferences
+- `Ticker` - Stock symbols being monitored
+- `UserTicker` - User-ticker subscriptions with custom schedules
+- `DataSource` - Scraped articles, social posts, market data
+- `Newsletter` - Generated newsletter instances
+- `NewsletterContent` - Sections and insights within newsletters
+- `UserFeedback` - Ratings, clicks, engagement metrics
+- `AgentMetrics` - Performance tracking for self-improvement
+- `ABTest` - A/B testing configurations and results
+- `AgentVersion` - Agent version history and metadata
+- `AgentVersionDeployment` - Production deployment assignments (which version is active)
+- `AgentExperiment` - Experimental runs and version comparisons
+- `AgentValidation` - Validation checks before version promotion
+- `AgentPromptVersion` - Prompt template versioning
+
+## Configuration Management System
+
+**All configurations are stored in the database and loaded dynamically. No hardcoded values.**
+
+### Configuration Storage
+
+- **Database Tables**:
+
+  - `AgentConfig` - Per-agent configurations (JSONB column with versioning)
+  - `SourceConfig` - Data source configurations (news sites, APIs, etc.)
+  - `UserPreferences` - User-specific preferences
+  - `SystemConfig` - Global system settings
+  - `ABTestConfig` - A/B testing configurations
+
+- **Configuration Loading**:
+
+  - Configs loaded at agent initialization from database
+  - Cached with TTL (configurable via SystemConfig)
+  - Hot-reloadable via admin API endpoint
+  - Versioned for rollback capability
+  - Config changes trigger agent re-initialization
+
+- **Configuration Hierarchy** (priority order):
+
+  1. User-specific preferences (highest priority)
+  2. Ticker-specific overrides
+  3. Agent-specific runtime overrides
+  4. Agent-specific defaults from AgentConfig table
+  5. System-wide defaults from SystemConfig table (lowest priority)
+
+- **Configuration Schema**:
+  - All configs stored as JSONB in PostgreSQL
+  - Schema validation using Zod schemas
+  - Type-safe config loading with TypeScript
+  - Config migration system for version updates
