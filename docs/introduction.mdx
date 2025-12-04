@@ -4,23 +4,39 @@ title: Introduction
 
 ## Features
 
-- **Intelligent Data Collection**: Automatically gathers information from news sites, social media platforms, market data APIs, and SEC filings using targeted search queries and intelligent web scraping
+### Data & Intelligence
+
+- **Intelligent Data Collection**: Automatically gathers information from news sites, social media platforms, market data APIs, and earnings calls using targeted search queries and intelligent web scraping
+- **Entity Intelligence**: Maintains dynamic entity relationship graphs (competitors, suppliers, customers, executives) to enhance search queries and provide comprehensive market context
+- **Real-Time Market Data**: Integrates with multiple market data providers (Alpha Vantage, Polygon, Yahoo Finance, etc.) for up-to-date pricing and technical indicators
+
+### AI & Analysis
+
 - **Multi-Agent Architecture**: Specialized AI agents handle different aspects of the pipeline (data collection, analysis, content generation, quality assurance, delivery, learning) for optimal performance and maintainability
 - **Comprehensive Analysis**: Performs technical analysis (RSI, MACD, moving averages), fundamental analysis (P/E ratios, growth metrics, peer comparisons), competitive landscape research, and sentiment analysis
-- **Personalized Content**: Generates newsletters tailored to each user's preferences, focus areas, and risk tolerance with customizable detail levels and delivery schedules
-- **Quality Assurance**: Automated fact-checking, compliance verification, and quality scoring ensure accurate, compliant, and high-quality content before delivery
 - **Self-Improving System**: Learning agent analyzes user feedback, engagement metrics, and agent performance to continuously optimize content generation strategies
-- **A/B Testing**: Built-in A/B testing framework allows experimentation with different content styles, structures, and delivery times to maximize engagement
-- **Entity Intelligence**: Maintains dynamic entity relationship graphs (competitors, suppliers, customers, executives) to enhance search queries and provide comprehensive market context
-- **Multi-Channel Delivery**: Delivers newsletters via email and web dashboard with tracking, personalization, and responsive design
-- **Database-Driven Configuration**: All system configurations stored in the database for dynamic updates without code deployments
-- **Scalable Architecture**: Queue-based job processing with BullMQ and Redis enables handling multiple tickers and users concurrently
-- **Real-Time Market Data**: Integrates with multiple market data providers (Alpha Vantage, Polygon, Yahoo Finance) for up-to-date pricing and technical indicators
+- **Agent Versioning**: Complete version history for all agents with admin-controlled production deployments. Learning agent creates optimized versions automatically, while admins maintain full control over which version runs in production with instant rollback capability
+
+### Content & Personalization
+
+- **Personalized Content**: Generates newsletters tailored to each user's preferences, focus areas, and risk tolerance with customizable detail levels and delivery schedules
 - **Executive-Focused Format**: Concise, actionable insights designed for busy professionals who need quick, informed decision-making support
+- **A/B Testing**: Built-in A/B testing framework allows experimentation with different content styles, structures, and delivery times to maximize engagement
+
+### Quality & Delivery
+
+- **Quality Assurance**: Automated fact-checking, compliance verification, and quality scoring ensure accurate, compliant, and high-quality content before delivery
+- **Multi-Channel Delivery**: Delivers newsletters via email and web dashboard with tracking, personalization, and responsive design
+
+### Infrastructure & Scalability
+
+- **Database-Driven Configuration**: All system configurations stored in the database for dynamic updates without code deployments
+- **Agent Version Management**: Version control system for agents with production deployment controls, performance tracking per version, and instant rollback capabilities
+- **Scalable Architecture**: Queue-based job processing with BullMQ and Redis enables handling multiple tickers and users concurrently
 
 ## System Architecture
 
-A modular multi-agent system built with Next.js (App Router), TypeScript, and OpenAI, designed for busy executives who need concise, actionable stock market insights.
+A modular multi-agent system built with Next.js (App Router), TypeScript, Python, and OpenAI, designed for busy executives who need concise, actionable stock market insights.
 
 ### Core Components
 
@@ -30,7 +46,7 @@ A modular multi-agent system built with Next.js (App Router), TypeScript, and Op
 4. **Content Generation Agent** - Creates newsletter content using AI with consistent formatting and tone
 5. **Quality Assurance Agent** - Validates content quality, fact-checks, and ensures compliance
 6. **Delivery Agent** - Handles email delivery and web dashboard updates
-7. **Learning Agent** - Tracks metrics, learns from user feedback, and optimizes content generation
+7. **Learning Agent** - Tracks metrics, learns from user feedback, optimizes content generation, and creates new agent versions with improvements
 8. **Scheduler Agent** - Manages periodic tasks and job orchestration
 
 ## Technical Stack

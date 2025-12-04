@@ -14,6 +14,17 @@ stock-newsletter/
 │   │   │   ├── newsletters/
 │   │   │   └── api/
 │   │   └── components/
+│   ├── admin/                  # Next.js admin dashboard
+│   │   ├── app/
+│   │   │   ├── (auth)/
+│   │   │   ├── dashboard/
+│   │   │   ├── agents/
+│   │   │   ├── versions/
+│   │   │   ├── config/
+│   │   │   ├── users/
+│   │   │   ├── monitoring/
+│   │   │   └── api/
+│   │   └── components/
 │   └── worker/                  # Background job processor
 │       └── agents/
 │           ├── scheduler/
@@ -48,6 +59,11 @@ Key entities:
 - `UserFeedback` - Ratings, clicks, engagement metrics
 - `AgentMetrics` - Performance tracking for self-improvement
 - `ABTest` - A/B testing configurations and results
+- `AgentVersion` - Agent version history and metadata
+- `AgentVersionDeployment` - Production deployment assignments (which version is active)
+- `AgentExperiment` - Experimental runs and version comparisons
+- `AgentValidation` - Validation checks before version promotion
+- `AgentPromptVersion` - Prompt template versioning
 
 ## Configuration Management System
 
@@ -84,4 +100,3 @@ Key entities:
   - Schema validation using Zod schemas
   - Type-safe config loading with TypeScript
   - Config migration system for version updates
-

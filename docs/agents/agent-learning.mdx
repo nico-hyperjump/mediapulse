@@ -104,6 +104,17 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
     agent: string,
     action: string,
     rationale: string
+  }>,
+  newVersions: Array<{
+    agentId: string,
+    version: string,
+    status: 'draft',
+    config: object,
+    expectedImprovement: number,
+    metadata: {
+      optimizationRationale: string,
+      changes: Array<{ component: string, change: string }>
+    }
   }>
 }
 ```
@@ -148,13 +159,21 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
    - Generate optimization recommendations for each agent
    - Calculate expected improvements
 
-8. **Update Configurations** (if auto-update enabled):
+8. **Version Creation** (for optimized agents):
 
-   - Apply approved optimizations
-   - Update agent configs
+   - Create new agent versions with optimized configurations
+   - Store version in `AgentVersion` table with status 'draft'
+   - Include optimization rationale and expected improvements in metadata
+   - Link version to performance metrics for comparison
+   - New versions require admin approval before production deployment
+
+9. **Update Configurations** (if auto-update enabled):
+
+   - Apply approved optimizations to draft versions
    - Update A/B test traffic splits
+   - Note: Production deployments require admin approval via admin dashboard
 
-9. **Return**: Analysis results and recommendations
+10. **Return**: Analysis results, recommendations, and newly created versions
 
 ## Sequence Diagram
 
@@ -175,9 +194,10 @@ flowchart TD
     E3 --> F
     E4 --> F
     
-    F --> G{auto-update enabled?}
-    G -->|Yes| H[Apply optimizations]
-    G -->|No| I[Return analysis & recommendations]
-    H --> I
+    F --> G[Create new agent versions<br/>with optimized configs<br/>Status: 'draft']
+    G --> H{auto-update enabled?}
+    H -->|Yes| I[Apply optimizations to draft versions]
+    H -->|No| J[Return analysis, recommendations & new versions]
+    I --> J
 "
 />

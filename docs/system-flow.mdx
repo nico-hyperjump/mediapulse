@@ -10,15 +10,15 @@ title: System Flow
   chart="
 flowchart TD
     A[Scheduler Agent<br/>6 AM daily] --> B[For each user-ticker subscription]
-    B --> C[Query Strategy Agent<br/>parallel for all tickers<br/>Discovers entities, generates search queries, optimizes strategies]
-    C --> D[Data Collection Agent<br/>parallel for all tickers<br/>Collects news, social, market data, earnings using generated queries]
-    D --> E[Analysis Agent<br/>parallel for all tickers<br/>Technical, fundamental, competitive, sentiment analysis]
-    E --> F[Content Generation Agent<br/>sequential per user<br/>Generates personalized newsletter]
-    F --> G[Quality Assurance Agent<br/>Validates content, checks compliance]
+    B --> C[Query Strategy Agent<br/>• parallel for all tickers<br/>• Discovers entities, generates search queries, optimizes strategies]
+    C --> D[Data Collection Agent<br/>• parallel for all tickers<br/>• Collects news, social, market data, earnings using generated queries]
+    D --> E[Analysis Agent<br/>• parallel for all tickers<br/>• Technical, fundamental, competitive, sentiment analysis]
+    E --> F[Content Generation Agent<br/>• sequential per user<br/>• Generates personalized newsletter]
+    F --> G[Quality Assurance Agent<br/>• Validates content, checks compliance]
     G --> H{Approved?}
-    H -->|Yes| I[Delivery Agent<br/>Sends email + updates dashboard]
+    H -->|Yes| I[Delivery Agent<br/>• Sends email + updates dashboard]
     H -->|No| F
-    I --> J[Learning Agent<br/>periodic, e.g., daily at midnight<br/>Analyzes metrics, optimizes, updates configs]
+    I --> J[Learning Agent<br/>• periodic, e.g., daily at midnight<br/>• Analyzes metrics, optimizes, updates configs]
 "
 />
 
@@ -114,6 +114,11 @@ sequenceDiagram
 - `/newsletters/[id]` - Individual newsletter view
 - `/tickers` - Ticker subscription management
 - `/settings` - User preferences and delivery options
+- `/admin/agents` - Agent version management (admin only)
+  - View all agent versions
+  - Compare version performance
+  - Deploy versions to production
+  - Rollback to previous versions
 
 ### Background Worker (`apps/worker/`)
 
@@ -145,6 +150,7 @@ Runs as a separate process to handle:
 3. **A/B Testing**: Test different summarization styles, content structures, delivery times
 4. **Continuous Learning**: Update prompts and strategies based on aggregated feedback
 5. **Agent Performance Tracking**: Monitor each agent's contribution to final newsletter quality
+6. **Agent Versioning**: Learning Agent creates new agent versions with optimizations; admins control which version runs in production
 
 ## Key Features
 

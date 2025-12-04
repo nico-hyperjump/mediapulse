@@ -9,6 +9,7 @@
     "agent-content-generation",
     "agent-quality-assurance",
     "agent-delivery",
-    "agent-learning"
+    "agent-learning",
+    "agent-versioning-experimentation"
   ]
 }
