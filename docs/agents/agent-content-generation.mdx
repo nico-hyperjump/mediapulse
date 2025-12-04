@@ -1,0 +1,194 @@
+---
+title: Content Generation Agent
+---
+
+## Purpose
+
+Transform analysis results into a well-structured, personalized newsletter with executive-friendly format.
+
+## Inputs
+
+- `ticker: string` - Stock symbol
+- `analysisResults: AnalysisOutput` - Output from Analysis Agent
+- `user: { id: string, preferences: UserPreferences, name: string }` - Recipient information
+- `newsletterType: 'daily' | 'weekly' | 'event-driven'` - Newsletter type
+- `previousNewsletter?: Newsletter` - Optional: previous newsletter for context
+
+## Configurations
+
+```typescript
+{
+  ai: {
+    model: 'gpt-4',
+    temperature: 0.7,
+    maxTokens: 4000,
+    systemPrompt: string // Base prompt template
+  },
+  tone: {
+    style: 'executive' | 'analytical' | 'concise',
+    formality: 'professional',
+    length: 'brief' | 'moderate' | 'detailed'
+  },
+  structure: {
+    sections: [
+      'executiveSummary',
+      'keyInsights',
+      'technicalAnalysis',
+      'fundamentalAnalysis',
+      'competitiveLandscape',
+      'sentiment',
+      'actionItems'
+    ],
+    maxLength: {
+      executiveSummary: 200,
+      keyInsights: 500,
+      eachSection: 300
+    }
+  },
+  personalization: {
+    includeCharts: true,
+    detailLevel: 'high' | 'medium' | 'low',
+    focusAreas: string[] // User's areas of interest
+  },
+  templates: {
+    email: 'templates/email-newsletter.html',
+    dashboard: 'templates/dashboard-newsletter.html'
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'content-generation',
+  ticker: string,
+  userId: string,
+  timestamp: Date,
+  executionTime: number,
+  newsletter: {
+    id: string,
+    title: string,
+    date: Date,
+    sections: {
+      executiveSummary: {
+        content: string,
+        keyPoints: string[]
+      },
+      keyInsights: Array<{
+        title: string,
+        description: string,
+        priority: 'high' | 'medium' | 'low',
+        source: string
+      }>,
+      technicalAnalysis: {
+        summary: string,
+        chartData: object, // For visualization
+        keyMetrics: Array<{ label: string, value: string }>
+      },
+      fundamentalAnalysis: {
+        summary: string,
+        metrics: Array<{ metric: string, value: number, vsPeer: string }>,
+        valuation: string
+      },
+      competitiveLandscape: {
+        summary: string,
+        marketPosition: string,
+        peerComparison: Array<{ ticker: string, comparison: string }>
+      },
+      sentiment: {
+        overall: string,
+        trend: string,
+        keyDrivers: string[]
+      },
+      actionItems: Array<{
+        action: string,
+        rationale: string,
+        priority: 'high' | 'medium' | 'low'
+      }>
+    },
+    metadata: {
+      wordCount: number,
+      readingTime: number,
+      personalizationScore: number,
+      abTestVariant?: string
+    }
+  },
+  rawContent: string, // Full markdown/HTML
+  emailHtml: string,
+  dashboardHtml: string
+}
+```
+
+**Process**:
+
+1. **Initialize**: Load user preferences, newsletter template, AI config
+2. **Context Building**:
+
+   - Combine analysis results into structured context
+   - Add user preferences and focus areas
+   - Include previous newsletter for trend context (if available)
+   - Determine A/B test variant (if active)
+
+3. **Prompt Construction**:
+
+   - Build system prompt with tone/style guidelines
+   - Create section-specific prompts
+   - Include examples of good newsletter content
+
+4. **Content Generation** (AI calls):
+
+   - **Executive Summary**: Generate 2-3 sentence overview
+   - **Key Insights**: Extract top 3-5 insights with priorities
+   - **Technical Analysis Section**: Summarize technical findings
+   - **Fundamental Analysis Section**: Summarize fundamental findings
+   - **Competitive Landscape**: Summarize competitive position
+   - **Sentiment Section**: Summarize sentiment analysis
+   - **Action Items**: Generate actionable recommendations (if enabled)
+
+5. **Personalization**:
+
+   - Adjust detail level based on user preferences
+   - Emphasize focus areas
+   - Customize tone if user has preferences
+
+6. **Formatting**:
+
+   - Apply newsletter template
+   - Generate email HTML version
+   - Generate dashboard HTML version
+   - Create chart data for visualizations
+
+7. **Quality Check**: Basic validation (length, structure, completeness)
+8. **Return**: Complete newsletter content
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler] --> B[Content Generation Agent]
+    B --> C[Agent receives analysisResults & user preferences]
+    C --> D[Build context<br/>analysis + user prefs + previous newsletter]
+    D --> E{A/B test active?}
+    E -->|Yes| F[Determine A/B test variant]
+    E -->|No| G[AI Content Generation Sequential]
+    F --> G
+    
+    subgraph Generation [AI Content Generation Sequential]
+        direction TB
+        G1[1. Executive Summary AI call] --> G2[2. Key Insights AI call]
+        G2 --> G3[3. Technical Analysis AI call]
+        G3 --> G4[4. Fundamental Analysis AI call]
+        G4 --> G5[5. Competitive Landscape AI call]
+        G5 --> G6[6. Sentiment AI call]
+        G6 --> G7[7. Action Items AI call]
+    end
+    
+    G --> Generation
+    Generation --> H[Personalization<br/>adjust for user preferences]
+    H --> I[Formatting<br/>apply templates, generate HTML]
+    I --> J[Quality Check]
+    J --> K[Return newsletter content]
+"
+/>

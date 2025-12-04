@@ -1,0 +1,14 @@
+{
+  "title": "Agents",
+  "defaultOpen": true,
+  "pages": [
+    "agent-scheduler",
+    "agent-query-strategy",
+    "agent-data-collection",
+    "agent-analysis",
+    "agent-content-generation",
+    "agent-quality-assurance",
+    "agent-delivery",
+    "agent-learning"
+  ]
+}

@@ -1,0 +1,472 @@
+---
+title: Data Collection Agent
+---
+
+## Purpose
+
+Collect raw data from multiple sources for specified stock tickers within a time window. Handles web scraping, API calls, and data aggregation with intelligent deduplication and relevance scoring.
+
+## What the Agent Does
+
+1. **Intelligent News Collection** (not blind scraping):
+
+   - Uses targeted search queries via news APIs (NewsAPI, Google News API, etc.) when available
+   - Leverages RSS feeds with ticker-specific filters
+   - Performs targeted web scraping only as fallback or for sources without APIs
+   - Searches for: ticker symbol, company name, competitors, industry keywords, executives, related events
+   - Filters by relevance before storing (not storing everything)
+
+2. **Comprehensive Social Media Monitoring**:
+
+   - Monitors ticker mentions directly
+   - Monitors competitor mentions and comparisons
+   - Tracks industry trends and sector discussions
+   - Monitors key executives and company personnel
+   - Tracks related events (product launches, partnerships, regulatory news)
+   - Monitors suppliers and customers (if publicly discussed)
+   - Uses intelligent query construction based on entity relationships
+
+3. **Entity Relationship Tracking**:
+
+   - Maintains entity graph: competitors, suppliers, customers, executives, industry peers
+   - Uses this graph to expand search queries intelligently
+   - Tracks relationships from SEC filings, company websites, industry databases
+
+4. **Market Data Fetching**:
+
+   - Fetches real-time and historical market data (prices, volume, technical indicators)
+   - Provider configurable (Alpha Vantage, Polygon, Yahoo Finance, etc.)
+
+5. **Earnings & SEC Filings**:
+
+   - Retrieves earnings call transcripts and SEC filings (8-K, 10-Q, 10-K)
+   - Extracts entity relationships from filings
+
+6. **Intelligent Processing**:
+
+   - Deduplicates content across sources using fuzzy matching and AI
+   - Scores relevance of collected items using AI-powered analysis
+   - Filters low-relevance content early in the pipeline
+
+7. **Data Management**:
+
+   - Stores raw data with full metadata for traceability and audit
+   - Handles rate limiting, retries, and error recovery per source
+   - Performs health checks on data sources before collection
+   - Enriches collected data with metadata (sentiment, entities, language)
+
+## Inputs
+
+```typescript
+interface DataCollectionInput {
+  ticker: string; // Stock symbol (e.g., "AAPL", "TSLA")
+  timeWindow: {
+    // Collection period
+    start: Date; // Start timestamp
+    end: Date; // End timestamp (default: now)
+  };
+  sources?: string[]; // Optional: specific sources to prioritize (e.g., ['bloomberg', 'reuters'])
+  priority: "high" | "medium" | "low"; // Collection urgency (affects retry behavior)
+  configOverride?: Partial<DataCollectionConfig>; // Optional runtime config override
+  userId?: string; // Optional: for user-specific source preferences
+  collectionId?: string; // Optional: unique ID for tracking this collection run
+}
+```
+
+**Configurations** (stored in `AgentConfig` table, key: `data-collection`):
+
+```typescript
+{
+  // News Sources Configuration
+  newsSources: {
+    bloomberg: {
+      enabled: boolean,               // Load from config
+      baseUrl: string,                // Load from config
+      rateLimit: {                    // Rate limiting config
+        requests: number,            // e.g., 10
+        perSeconds: number           // e.g., 60
+      },
+      selectors: {                   // CSS selectors for scraping
+        articleContainer: string,
+        title: string,
+        content: string,
+        date: string,
+        author: string
+      },
+      searchUrl: string,              // URL pattern with {ticker} placeholder
+      requiresAuth: boolean,
+      authConfig?: object
+    },
+    reuters: { /* same structure */ },
+    wsj: { /* same structure */ },
+    cnbc: { /* same structure */ },
+    // Additional sources can be added via config
+  },
+
+  // Social Media Configuration
+  socialMedia: {
+    twitter: {
+      enabled: boolean,
+      apiKey: string,                 // From env or config
+      apiSecret: string,              // From env or config
+      rateLimit: {
+        requests: number,            // e.g., 300
+        perSeconds: number           // e.g., 900 (15 min)
+      },
+      filters: {
+        minFollowers: number,        // Filter low-quality accounts
+        verifiedOnly: boolean,
+        minEngagement: number
+      },
+      searchQuery: string             // Template: "{ticker} OR ${ticker} stock"
+    },
+    reddit: {
+      enabled: boolean,
+      rateLimit: {
+        requests: number,
+        perSeconds: number
+      },
+      subreddits: string[],           // ['stocks', 'investing', 'SecurityAnalysis']
+      minUpvotes: number,             // Quality filter
+      minComments: number
+    }
+  },
+
+  // Market Data Configuration
+  marketData: {
+    provider: 'alpha_vantage' | 'polygon' | 'yahoo' | 'custom',
+    apiKey: string,                   // From env or config
+    baseUrl: string,                  // API endpoint
+    indicators: string[],              // ['price', 'volume', 'rsi', 'macd', 'sma_50', 'sma_200']
+    timeframes: string[],             // ['1D', '1W', '1M', '3M', '1Y']
+    historicalDays: number,           // How many days of history to fetch
+    cacheEnabled: boolean,
+    cacheTTL: number                  // Seconds
+  },
+
+  // Earnings Configuration
+  earnings: {
+    enabled: boolean,
+    secApiKey: string,                // SEC EDGAR API key
+    transcriptSources: string[],      // ['seekingalpha', 'fool', 'custom']
+    lookbackDays: number,             // How many days to look back
+    transcriptApiConfig?: {           // If using third-party API
+      provider: string,
+      apiKey: string,
+      baseUrl: string
+    }
+  },
+
+  // Scraping Configuration
+  scraping: {
+    headless: boolean,                // Browser headless mode
+    timeout: number,                  // Milliseconds
+    retries: number,                  // Max retry attempts
+    retryDelay: number,               // Milliseconds between retries
+    userAgent: string,                // Custom user agent
+    proxyRotation: {
+      enabled: boolean,
+      proxies: string[],              // Proxy list
+      rotationStrategy: 'round-robin' | 'random'
+    },
+    waitForSelector: number,         // Max wait time for selectors
+    screenshotOnError: boolean        // Debug feature
+  },
+
+  // Relevance Scoring Configuration
+  relevanceScoring: {
+    enabled: boolean,
+    aiModel: string,                  // 'gpt-4', 'gpt-3.5-turbo'
+    minScore: number,                 // 0-1, items below this are filtered
+    scoringPrompt: string,             // AI prompt template
+    factors: {                         // Weighted factors
+      recency: number,                // Weight: 0-1
+      engagement: number,
+      sourceCredibility: number,
+      contentRelevance: number
+    }
+  },
+
+  // Deduplication Configuration
+  deduplication: {
+    enabled: boolean,
+    similarityThreshold: number,      // 0-1, similarity score threshold
+    methods: ('title' | 'content' | 'url')[], // Deduplication methods
+    aiDeduplication: boolean          // Use AI for fuzzy matching
+  },
+
+  // Error Handling
+  errorHandling: {
+    continueOnError: boolean,         // Continue if one source fails
+    maxErrorsPerSource: number,       // Max errors before disabling source
+    errorNotification: {
+      enabled: boolean,
+      channels: string[]              // ['email', 'slack', 'webhook']
+    }
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'data-collection',
+  ticker: string,
+  timestamp: Date,
+  executionTime: number,              // Milliseconds
+  data: {
+    news: Array<{
+      id: string,                     // Unique identifier
+      title: string,
+      url: string,
+      source: string,                 // 'bloomberg', 'reuters', etc.
+      publishedAt: Date,
+      content: string,                // Full article text or excerpt
+      excerpt: string,                // First paragraph
+      author: string | null,
+      relevanceScore: number,        // 0-1, AI-calculated
+      metadata: {
+        wordCount: number,
+        language: string,
+        sentiment?: number            // Optional pre-calculated sentiment
+      }
+    }>,
+    socialMedia: Array<{
+      id: string,
+      platform: 'twitter' | 'reddit',
+      author: {
+        username: string,
+        verified: boolean,
+        followers?: number
+      },
+      content: string,
+      publishedAt: Date,
+      url: string,
+      engagement: {
+        likes: number,
+        shares: number,
+        comments: number,
+        views?: number
+      },
+      relevanceScore: number,
+      metadata: {
+        hashtags: string[],
+        mentions: string[],
+        links: string[]
+      }
+    }>,
+    marketData: {
+      currentPrice: number,
+      change: number,
+      changePercent: number,
+      volume: number,
+      marketCap?: number,
+      indicators: {
+        rsi: {
+          value: number,
+          signal: 'overbought' | 'oversold' | 'neutral'
+        },
+        macd: {
+          value: number,
+          signal: number,
+          histogram: number,
+          trend: 'bullish' | 'bearish' | 'neutral'
+        },
+        sma50: number,
+        sma200: number,
+        ema12?: number,
+        ema26?: number
+      },
+      priceHistory: Array<{
+        date: Date,
+        open: number,
+        high: number,
+        low: number,
+        close: number,
+        volume: number
+      }>,
+      metadata: {
+        lastUpdated: Date,
+        dataQuality: 'high' | 'medium' | 'low'
+      }
+    },
+    earnings: Array<{
+      id: string,
+      quarter: string,                // 'Q1 2024'
+      date: Date,
+      transcriptUrl: string,
+      summary: string,                // AI-generated summary
+      keyMetrics: {
+        revenue: number,
+        eps: number,
+        guidance: {
+          revenue?: { low: number, high: number },
+          eps?: { low: number, high: number }
+        }
+      },
+      highlights: string[],           // Key points from call
+      metadata: {
+        duration: number,             // Minutes
+        participants: string[]
+      }
+    }>
+  },
+  metadata: {
+    sourcesProcessed: number,
+    sourcesSucceeded: number,
+    sourcesFailed: number,
+    itemsCollected: number,
+    itemsFiltered: number,            // Filtered by relevance
+    duplicatesRemoved: number,
+    errors: Array<{
+      source: string,
+      error: string,
+      timestamp: Date,
+      retryCount: number
+    }>,
+    performance: {
+      newsCollectionTime: number,
+      socialCollectionTime: number,
+      marketDataTime: number,
+      earningsTime: number
+    }
+  }
+}
+```
+
+## Process (Step-by-Step)
+
+1. **Initialization Phase**:
+
+   - Load agent configuration from database (`AgentConfig` table)
+   - Validate inputs (ticker format, time window)
+   - Initialize rate limiters for each source
+   - Check source availability (health checks)
+   - Initialize browser instances (if scraping)
+
+2. **Configuration Resolution**:
+
+   - Merge system defaults, agent config, and runtime overrides
+   - Resolve API keys from environment or secure storage
+   - Load source-specific configurations
+
+3. **Parallel Collection Phase** (all sources run concurrently):
+
+**3a. News Scraping** (for each enabled news source):
+
+- Check rate limits (skip if exceeded)
+- Navigate to source's search/ticker page (using Playwright if dynamic)
+- Wait for content to load (configurable timeout)
+- Extract articles using configured CSS selectors
+- Filter by time window (publishedAt within range)
+- Extract metadata (title, content, author, date, URL)
+- Store raw HTML/content for later processing
+- Handle pagination if needed
+- Retry on failure (with exponential backoff)
+
+**3b. Social Media Monitoring**:
+
+- **Twitter**:
+  - Authenticate with API (OAuth 2.0)
+  - Query search API with ticker mentions
+  - Filter by date range
+  - Apply quality filters (min followers, engagement)
+  - Extract engagement metrics
+- **Reddit**:
+  - Query Reddit API for ticker mentions in configured subreddits
+  - Filter by upvotes/comments thresholds
+  - Extract post content and engagement
+
+**3c. Market Data Fetching**:
+
+- Authenticate with market data provider API
+- Fetch current quote (price, volume, change)
+- Fetch historical OHLCV data for configured timeframes
+- Calculate technical indicators (RSI, MACD, SMAs) using historical data
+- Cache results if caching enabled
+
+**3d. Earnings Calls**:
+
+- Query SEC EDGAR API for recent filings (8-K, 10-Q)
+- Identify earnings-related filings
+- Fetch transcripts from configured sources
+- Extract key metrics using AI (revenue, EPS, guidance)
+- Generate summary of earnings call
+
+4. **Post-Collection Processing**:
+
+**4a. Deduplication**:
+
+- Compare articles/posts by title similarity (fuzzy matching)
+- Compare by content similarity (if enabled)
+- Compare by URL (exact match)
+- Use AI for fuzzy content matching if enabled
+- Mark duplicates and keep highest quality version
+
+**4b. Relevance Scoring** (AI-powered):
+
+- For each collected item, call AI with ticker context
+- Score relevance (0-1) based on:
+  - Direct ticker mentions
+  - Related company/industry mentions
+  - Recency (newer = higher score)
+  - Source credibility
+- Filter items below minimum relevance score
+
+**4c. Data Enrichment**:
+
+- Add metadata (word count, language detection)
+- Extract entities (companies, people, locations)
+- Pre-calculate sentiment (optional, for performance)
+
+5. **Storage Phase**:
+
+   - Save all collected data to `DataSource` table
+   - Store raw content for audit trail
+   - Link to ticker and collection timestamp
+   - Update source health status
+
+6. **Error Handling**:
+
+   - Log all errors with context
+   - Retry failed sources (up to max retries)
+   - Disable sources that exceed max errors
+   - Send notifications for critical failures
+
+7. **Return Phase**:
+
+   - Aggregate all collected data
+   - Calculate metadata (counts, timing, errors)
+   - Return structured output to scheduler
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler] -->|execute ticker, timeWindow, config| B[Data Collection Agent]
+    B --> B1[1. Load config from DB]
+    B1 --> B2[2. Validate inputs]
+    B2 --> B3[3. Initialize rate limiters]
+    B3 --> C[Parallel Collection 4 Workers]
+    
+    subgraph Collection [Parallel Collection 4 Workers]
+        direction TB
+        C1[News Scraper<br/>Bloomberg<br/>Reuters<br/>WSJ<br/>CNBC] --> C2[Social Monitor<br/>Twitter API<br/>Reddit API]
+        C2 --> C3[Market Data<br/>Alpha Vantage<br/>Polygon]
+        C3 --> C4[Earnings Fetch<br/>SEC EDGAR<br/>Transcripts]
+    end
+    
+    C --> Collection
+    Collection --> D[Post-Processing]
+    D --> D1[1. Deduplication]
+    D1 --> D2[2. Relevance Scoring AI]
+    D2 --> D3[3. Data Enrichment]
+    D3 --> E[Storage]
+    E --> E1[Save to DataSource table]
+    E1 --> E2[Update source health]
+    E2 --> F[Return Results<br/>Collected data<br/>Metadata<br/>Errors]
+    F --> G[Scheduler]
+"
+/>

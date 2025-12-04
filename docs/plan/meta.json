@@ -1,0 +1,15 @@
+{
+  "title": "Project Planning",
+  "defaultOpen": true,
+  "pages": [
+    "index",
+    "q1-foundation",
+    "q2-data-collection",
+    "q3-analysis-content",
+    "q4-delivery-production",
+    "success-metrics",
+    "risk-mitigation",
+    "dependencies",
+    "review-process"
+  ]
+}

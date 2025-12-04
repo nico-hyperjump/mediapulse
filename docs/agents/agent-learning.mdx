@@ -1,0 +1,183 @@
+---
+title: Learning Agent
+---
+
+## Purpose
+
+Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests.
+
+## Inputs
+
+- `metrics: Array<MetricEvent>` - Engagement metrics (opens, clicks, time spent)
+- `feedback: Array<UserFeedback>` - Explicit user feedback (ratings, comments)
+- `newsletterPerformance: Array<NewsletterMetrics>` - Newsletter performance data
+- `agentPerformance: Array<AgentMetrics>` - Performance of other agents
+
+## Configurations
+
+```typescript
+{
+  metrics: {
+    collectionInterval: 3600, // seconds
+    retentionDays: 90,
+    trackEngagement: true,
+    trackFeedback: true,
+    trackAgentPerformance: true
+  },
+  optimization: {
+    enabled: true,
+    updateFrequency: 'daily',
+    minDataPoints: 100,
+    confidenceLevel: 0.95
+  },
+  abTesting: {
+    enabled: true,
+    variants: Array<{
+      id: string,
+      name: string,
+      config: object,
+      trafficSplit: number
+    }>,
+    metrics: ['openRate', 'clickRate', 'engagementTime', 'feedbackScore'],
+    minSampleSize: 50,
+    significanceLevel: 0.05
+  },
+  ai: {
+    feedbackAnalysisModel: 'gpt-4',
+    optimizationModel: 'gpt-4',
+    temperature: 0.3
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'learning',
+  timestamp: Date,
+  executionTime: number,
+  analysis: {
+    engagement: {
+      averageOpenRate: number,
+      averageClickRate: number,
+      averageEngagementTime: number,
+      trends: {
+        openRate: 'increasing' | 'decreasing' | 'stable',
+        clickRate: 'increasing' | 'decreasing' | 'stable',
+        engagementTime: 'increasing' | 'decreasing' | 'stable'
+      },
+      topPerformingSections: string[],
+      lowPerformingSections: string[]
+    },
+    feedback: {
+      averageRating: number,
+      sentiment: 'positive' | 'negative' | 'neutral',
+      commonThemes: Array<{ theme: string, frequency: number, sentiment: string }>,
+      suggestions: Array<{ suggestion: string, priority: 'high' | 'medium' | 'low' }>
+    },
+    agentPerformance: {
+      dataCollection: { avgExecutionTime: number, successRate: number, qualityScore: number },
+      analysis: { avgExecutionTime: number, accuracyScore: number },
+      contentGeneration: { avgExecutionTime: number, qualityScore: number, userSatisfaction: number },
+      qualityAssurance: { avgExecutionTime: number, catchRate: number }
+    }
+  },
+  optimizations: Array<{
+    agent: string,
+    component: string,
+    currentConfig: object,
+    recommendedConfig: object,
+    expectedImprovement: number,
+    confidence: number
+  }>,
+  abTestResults: Array<{
+    testId: string,
+    variant: string,
+    metrics: object,
+    winner?: string,
+    confidence: number,
+    recommendation: 'keep' | 'reject' | 'continue'
+  }>,
+  recommendations: Array<{
+    priority: 'high' | 'medium' | 'low',
+    agent: string,
+    action: string,
+    rationale: string
+  }>
+}
+```
+
+## Process
+
+1. **Initialize**: Load metrics config, A/B test configs
+2. **Metrics Collection**:
+
+   - Aggregate engagement metrics (opens, clicks, time spent) from last period
+   - Collect user feedback (ratings, comments)
+   - Collect agent performance metrics
+   - Store in database
+
+3. **Engagement Analysis**:
+
+   - Calculate averages and trends
+   - Identify top/low performing content sections
+   - Analyze engagement patterns by user segment
+
+4. **Feedback Analysis**:
+
+   - Aggregate ratings and calculate average
+   - Use AI to analyze comments for themes and sentiment
+   - Extract actionable suggestions
+
+5. **Agent Performance Analysis**:
+
+   - Analyze execution times, success rates, quality scores
+   - Identify bottlenecks and improvement opportunities
+
+6. **A/B Test Analysis**:
+
+   - For each active A/B test, compare variant performance
+   - Calculate statistical significance
+   - Determine winners
+   - Generate recommendations
+
+7. **Optimization**:
+
+   - Use AI to analyze patterns and suggest config changes
+   - Generate optimization recommendations for each agent
+   - Calculate expected improvements
+
+8. **Update Configurations** (if auto-update enabled):
+
+   - Apply approved optimizations
+   - Update agent configs
+   - Update A/B test traffic splits
+
+9. **Return**: Analysis results and recommendations
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Periodic Trigger / Event] --> B[Learning Agent]
+    B --> C[Collect metrics from database<br/>engagement, feedback, agent performance]
+    C --> D[Analysis Parallel]
+    
+    D --> E1[Engagement Analyzer<br/>Calculate averages/trends<br/>Identify top/low performers]
+    D --> E2[Feedback Analyzer<br/>Aggregate ratings<br/>AI: Analyze comments<br/>Extract themes & suggestions]
+    D --> E3[Agent Performance Analyzer<br/>Analyze execution times<br/>Analyze success rates<br/>Identify bottlenecks]
+    D --> E4[A/B Test Analyzer<br/>Compare variants<br/>Calculate significance<br/>Determine winners]
+    
+    E1 --> F[AI: Generate optimization recommendations]
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    
+    F --> G{auto-update enabled?}
+    G -->|Yes| H[Apply optimizations]
+    G -->|No| I[Return analysis & recommendations]
+    H --> I
+"
+/>

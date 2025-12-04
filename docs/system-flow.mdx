@@ -1,0 +1,165 @@
+---
+title: System Flow
+---
+
+## Complete System Flow
+
+**Daily Newsletter Generation Sequence**:
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler Agent<br/>6 AM daily] --> B[For each user-ticker subscription]
+    B --> C[Query Strategy Agent<br/>parallel for all tickers<br/>Discovers entities, generates search queries, optimizes strategies]
+    C --> D[Data Collection Agent<br/>parallel for all tickers<br/>Collects news, social, market data, earnings using generated queries]
+    D --> E[Analysis Agent<br/>parallel for all tickers<br/>Technical, fundamental, competitive, sentiment analysis]
+    E --> F[Content Generation Agent<br/>sequential per user<br/>Generates personalized newsletter]
+    F --> G[Quality Assurance Agent<br/>Validates content, checks compliance]
+    G --> H{Approved?}
+    H -->|Yes| I[Delivery Agent<br/>Sends email + updates dashboard]
+    H -->|No| F
+    I --> J[Learning Agent<br/>periodic, e.g., daily at midnight<br/>Analyzes metrics, optimizes, updates configs]
+"
+/>
+
+<Mermaid
+  chart="
+sequenceDiagram
+    participant Scheduler as Scheduler Agent
+    participant QueryStrategy as Query Strategy Agent
+    participant DataCollection as Data Collection Agent
+    participant Analysis as Analysis Agent
+    participant ContentGen as Content Generation Agent
+    participant QA as Quality Assurance Agent
+    participant Delivery as Delivery Agent
+    participant Learning as Learning Agent
+
+    Note over Scheduler: Daily trigger (6 AM)
+    Scheduler->>QueryStrategy: For each user-ticker subscription
+    activate QueryStrategy
+    QueryStrategy->>QueryStrategy: Discover entities<br/>(competitors, executives, etc.)
+    QueryStrategy->>QueryStrategy: Generate search queries<br/>(news, social, web)
+    QueryStrategy->>QueryStrategy: Optimize query strategies
+    QueryStrategy-->>DataCollection: Entity graph + queries
+    deactivate QueryStrategy
+
+    activate DataCollection
+    DataCollection->>DataCollection: Collect news, social,<br/>market data, earnings
+    DataCollection-->>Analysis: Collected data
+    deactivate DataCollection
+
+    activate Analysis
+    Analysis->>Analysis: Technical analysis
+    Analysis->>Analysis: Fundamental analysis
+    Analysis->>Analysis: Competitive analysis
+    Analysis->>Analysis: Sentiment analysis
+    Analysis-->>ContentGen: Analysis results
+    deactivate Analysis
+
+    activate ContentGen
+    ContentGen->>ContentGen: Generate personalized<br/>newsletter content
+    ContentGen-->>QA: Newsletter draft
+    deactivate ContentGen
+
+    activate QA
+    QA->>QA: Validate content
+    QA->>QA: Check compliance
+    alt Approved
+        QA-->>Delivery: Approved newsletter
+    else Not Approved
+        QA-->>ContentGen: Request revision
+        ContentGen-->>QA: Revised newsletter
+    end
+    deactivate QA
+
+    activate Delivery
+    Delivery->>Delivery: Send email
+    Delivery->>Delivery: Update dashboard
+    Delivery-->>Learning: Delivery metrics
+    deactivate Delivery
+
+    Note over Learning: Periodic (e.g., daily at midnight)
+    activate Learning
+    Learning->>Learning: Analyze metrics
+    Learning->>Learning: Optimize configs
+    Learning->>Learning: Update strategies
+    deactivate Learning
+
+"
+/>
+
+**Error Handling & Retries**:
+
+- Each agent has retry logic with exponential backoff
+- Scheduler handles pipeline failures and can retry entire pipeline or specific stages
+- Critical errors are logged and trigger alerts
+- Failed newsletters are queued for manual review
+
+## Implementation Details
+
+### Web Dashboard (`apps/web/`)
+
+**Features**:
+
+- User authentication and profile management
+- Ticker subscription management
+- Newsletter archive and search
+- Interactive charts and visualizations
+- Feedback collection (ratings, comments)
+- Preferences (delivery frequency, insight types)
+
+**Key Pages**:
+
+- `/dashboard` - Overview with recent newsletters
+- `/newsletters/[id]` - Individual newsletter view
+- `/tickers` - Ticker subscription management
+- `/settings` - User preferences and delivery options
+
+### Background Worker (`apps/worker/`)
+
+Runs as a separate process to handle:
+
+- Scheduled newsletter generation
+- Data collection jobs
+- Email delivery
+- Analytics processing
+
+### AI Integration (`packages/ai/`)
+
+- OpenAI client wrapper with retry logic
+- Prompt templates for different content types
+- Token usage tracking and cost optimization
+- Response caching for similar queries
+
+### Email Templates (`packages/email/`)
+
+- HTML email templates with responsive design
+- Plain text fallbacks
+- Personalization variables
+- Unsubscribe handling
+
+## Self-Improvement Mechanisms
+
+1. **User Feedback Loop**: Collect ratings, track engagement, analyze which content types perform best
+2. **Performance Metrics**: Track accuracy, relevance scores, delivery success rates
+3. **A/B Testing**: Test different summarization styles, content structures, delivery times
+4. **Continuous Learning**: Update prompts and strategies based on aggregated feedback
+5. **Agent Performance Tracking**: Monitor each agent's contribution to final newsletter quality
+
+## Key Features
+
+- **Modular Architecture**: Each agent is independently deployable and testable
+- **Scalability**: Queue-based job processing handles multiple tickers/users
+- **Reliability**: Error handling, retries, and monitoring at each stage
+- **Self-Improving**: Automated optimization based on user feedback and metrics
+- **Executive-Focused**: Concise, actionable insights for busy professionals
+
+## Environment Variables
+
+- `OPENAI_API_KEY` - OpenAI API key
+- `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection for BullMQ
+- `RESEND_API_KEY` - Email service API key
+- `ALPHA_VANTAGE_API_KEY` - Market data API key
+- `NEXTAUTH_SECRET` - NextAuth.js secret
+- `NEXTAUTH_URL` - Application URL

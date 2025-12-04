@@ -1,0 +1,55 @@
+---
+title: Introduction
+---
+
+## About
+
+MediaPulse is an intelligent, multi-agent platform designed to deliver personalized, actionable stock market insights to busy executives and investors. The system automatically collects data from multiple sources (news sites, social media, market data APIs, earnings calls), performs comprehensive analysis (technical, fundamental, competitive, and sentiment), and generates executive-friendly newsletters tailored to each user's preferences.
+
+Built with modern technologies including Next.js, TypeScript, and OpenAI's GPT-4, the system employs a modular architecture where specialized AI agents work together to transform raw market data into concise, high-quality investment intelligence. The platform continuously learns and improves through user feedback, engagement metrics, and A/B testing, ensuring that the content quality and relevance improve over time.
+
+The system is designed for scalability and reliability, with robust error handling, retry mechanisms, and comprehensive monitoring. All configurations are stored in the database and can be updated dynamically without code changes, making it easy to adapt to changing market conditions and user needs.
+
+## Features
+
+- **Intelligent Data Collection**: Automatically gathers information from news sites, social media platforms, market data APIs, and SEC filings using targeted search queries and intelligent web scraping
+- **Multi-Agent Architecture**: Specialized AI agents handle different aspects of the pipeline (data collection, analysis, content generation, quality assurance, delivery, learning) for optimal performance and maintainability
+- **Comprehensive Analysis**: Performs technical analysis (RSI, MACD, moving averages), fundamental analysis (P/E ratios, growth metrics, peer comparisons), competitive landscape research, and sentiment analysis
+- **Personalized Content**: Generates newsletters tailored to each user's preferences, focus areas, and risk tolerance with customizable detail levels and delivery schedules
+- **Quality Assurance**: Automated fact-checking, compliance verification, and quality scoring ensure accurate, compliant, and high-quality content before delivery
+- **Self-Improving System**: Learning agent analyzes user feedback, engagement metrics, and agent performance to continuously optimize content generation strategies
+- **A/B Testing**: Built-in A/B testing framework allows experimentation with different content styles, structures, and delivery times to maximize engagement
+- **Entity Intelligence**: Maintains dynamic entity relationship graphs (competitors, suppliers, customers, executives) to enhance search queries and provide comprehensive market context
+- **Multi-Channel Delivery**: Delivers newsletters via email and web dashboard with tracking, personalization, and responsive design
+- **Database-Driven Configuration**: All system configurations stored in the database for dynamic updates without code deployments
+- **Scalable Architecture**: Queue-based job processing with BullMQ and Redis enables handling multiple tickers and users concurrently
+- **Real-Time Market Data**: Integrates with multiple market data providers (Alpha Vantage, Polygon, Yahoo Finance) for up-to-date pricing and technical indicators
+- **Executive-Focused Format**: Concise, actionable insights designed for busy professionals who need quick, informed decision-making support
+
+## System Architecture
+
+A modular multi-agent system built with Next.js (App Router), TypeScript, and OpenAI, designed for busy executives who need concise, actionable stock market insights.
+
+### Core Components
+
+1. **Entity Intelligence Agent** - Maintains entity relationships, generates dynamic search queries, detects trends, and learns from successful content
+2. **Data Collection Agent** - Uses queries from Entity Intelligence Agent to collect data from news sites, social media, market data APIs, and earnings calls
+3. **Analysis Agent** - Performs technical analysis, fundamental analysis, and competitive landscape research
+4. **Content Generation Agent** - Creates newsletter content using AI with consistent formatting and tone
+5. **Quality Assurance Agent** - Validates content quality, fact-checks, and ensures compliance
+6. **Delivery Agent** - Handles email delivery and web dashboard updates
+7. **Learning Agent** - Tracks metrics, learns from user feedback, and optimizes content generation
+8. **Scheduler Agent** - Manages periodic tasks and job orchestration
+
+## Technical Stack
+
+- **Framework**: Next.js 16+ (App Router) with TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Queue System**: BullMQ with Redis for job processing
+- **AI Provider**: OpenAI (GPT-4) with fallback support
+- **Email**: Resend or SendGrid
+- **Web Scraping**: Playwright for dynamic content, Cheerio for static
+- **Market Data**: Alpha Vantage, Yahoo Finance API, or Polygon.io
+- **Authentication**: NextAuth.js for user management
+- **Monitoring**: Custom metrics dashboard + error tracking
+
