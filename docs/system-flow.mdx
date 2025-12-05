@@ -179,12 +179,15 @@ sequenceDiagram
     alt Approved
         QA->>Delivery: Approved newsletter
         Delivery->>DB: Store delivery metrics
+        Delivery->>User: Newsletter with feedback buttons
+        User->>DB: Submit section feedback (Like/Dislike, Useful/Irrelevant)
     else Not Approved
         QA->>Content: Request revision
     end
 
     Note over Learning: Daily midnight: Learning
-    Learning->>DB: Read all metrics
+    Learning->>DB: Read all metrics + section feedback
+    Learning->>DB: Analyze section feedback patterns
     Learning->>DB: Update agent configs
     Learning->>QS: Update query strategies
 
@@ -206,7 +209,7 @@ flowchart LR
     end
     
     subgraph Storage [Shared Storage Layer]
-        DB[(PostgreSQL<br/>• Entity Graph<br/>• Queries<br/>• Collected Data<br/>• Analysis Results<br/>• Newsletters<br/>• Metrics)]
+        DB[(PostgreSQL<br/>• Entity Graph<br/>• Queries<br/>• Collected Data<br/>• Analysis Results<br/>• Newsletters<br/>• Metrics<br/>• Section Feedback)]
         Cache[(Redis Cache<br/>• Query results<br/>• Rate limits<br/>• Job queue)]
         Queue[(Job Queue<br/>BullMQ<br/>• Agent jobs<br/>• Retries<br/>• Priorities)]
     end
@@ -220,7 +223,8 @@ flowchart LR
     Content -->|Read analysis| DB
     Content -->|Write newsletter| DB
     Delivery -->|Write metrics| DB
-    Learning -->|Read metrics| DB
+    User -->|Submit feedback| DB
+    Learning -->|Read metrics + feedback| DB
     Learning -->|Update configs| DB
     
     Agents -->|Jobs| Queue

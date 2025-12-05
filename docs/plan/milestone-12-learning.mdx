@@ -24,12 +24,17 @@ Add metrics collection and basic optimization capabilities.
 - ✅ **Metrics Collection**:
   - Engagement metrics (opens, clicks, time spent)
   - User feedback collection (ratings, comments)
+  - **Section-level feedback** (Like/Dislike, Useful/Irrelevant per section)
   - Newsletter performance tracking
   - Agent performance metrics
 - ✅ **Basic Analysis**:
   - Engagement rate calculations
   - Trend detection
   - Top/low performing content identification
+  - **Section feedback analysis**:
+    - Identify sections with high/low feedback scores
+    - Correlate feedback with content types and topics
+    - Track feedback trends over time
 - ✅ **Optimization Recommendations**:
   - Basic config optimization suggestions
   - Simple A/B test analysis
@@ -39,6 +44,7 @@ Add metrics collection and basic optimization capabilities.
 ### Database Updates
 
 - ✅ User feedback table (if not exists)
+- ✅ Section feedback analytics views (aggregates section-level feedback)
 - ✅ Agent metrics table (if not exists)
 - ✅ Engagement tracking
 
@@ -46,6 +52,7 @@ Add metrics collection and basic optimization capabilities.
 
 - ✅ Feedback collection UI (ratings, comments)
 - ✅ Basic analytics dashboard
+- ✅ Section feedback analytics visualization
 - ✅ Admin metrics view
 
 ### Delivery Agent (Update)
@@ -63,7 +70,8 @@ Add metrics collection and basic optimization capabilities.
 ## Success Criteria
 
 - ✅ Collects engagement metrics accurately
-- ✅ Tracks user feedback
+- ✅ Tracks user feedback (including section-level feedback)
+- ✅ Analyzes section feedback patterns
 - ✅ Generates basic optimization recommendations
 - ✅ A/B test results are tracked
 - ✅ Metrics dashboard displays data correctly

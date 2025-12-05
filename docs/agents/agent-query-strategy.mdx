@@ -377,13 +377,24 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 }
 ```
 
+## Scheduling
+
+The Query Strategy Agent runs **independently** on its own schedule:
+
+- **Entity Graph Refresh**: Weekly (configurable per ticker) - Discovers and updates entity relationships
+- **Query Optimization**: Daily - Analyzes previous day's query performance and optimizes strategies
+- **Query Generation**: On-demand or when entity graph updates - Generates new search queries
+- **Manual Trigger**: Can be triggered manually via API or admin interface
+
+The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents.
+
 ## Process (Step-by-Step)
 
 ### **Initialization Phase**
 
-- Load agent configuration from database
+- Load agent configuration from database (hot-reloadable, no restart needed)
 - Check if entity graph exists for company identifier
-- Load previous query performance data
+- Load previous query performance data from database (asynchronous feedback from Data Collection Agent)
 - Initialize AI clients
 - Determine regulatory filing sources based on market region
 
@@ -456,17 +467,18 @@ This is run if previous results are available.
 
 ### **Storage**
 
-- Save the entity graph to the database
-- Store the generated queries
-- Update the query performance metrics
+- Save the entity graph to the database (available for other agents to read independently)
+- Store the generated queries in the database (Data Collection Agent reads these asynchronously)
+- Update the query performance metrics (used by Learning Agent and future optimization cycles)
 - Log the optimization decisions
+- **No direct agent communication**: All outputs are persisted to the database; other agents read independently when they run
 
 ## Sequence Diagram
 
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] --> B[Query Strategy Agent]
+    A[Scheduler or Manual Trigger] --> B[Query Strategy Agent<br/>Runs Independently]
     B --> C[Agent receives identifier + context]
     C --> D[Entity Graph Management]
     
@@ -490,15 +502,10 @@ flowchart TD
     QueryGen --> H[Keyword Tracking parallel<br/>Analyze trends<br/>Identify emerging keywords]
     H --> I{Previous results available?}
     I -->|Yes| J[Query Optimization<br/>Analyze performance<br/>Generate optimized variants]
-    I -->|No| K[Return: Entity Graph + Queries + Keywords]
+    I -->|No| K[Write to Database<br/>Entity Graph + Queries + Keywords]
     J --> K
-    K --> L[Data Collection Agent uses queries]
+    K --> DB[(Database<br/>Shared Storage)]
+    DB -.->|Reads independently| DC[Data Collection Agent<br/>Runs on own schedule]
+    DB -.->|Reads feedback| B
 "
 />
-
-## Integration with Data Collection Agent
-
-- Query Strategy Agent runs **before** Data Collection Agent
-- Data Collection Agent receives generated queries and uses them for targeted searches
-- Data Collection Agent provides feedback (results, relevance scores) back to Query Strategy Agent
-- Query Strategy Agent uses feedback to optimize future queries

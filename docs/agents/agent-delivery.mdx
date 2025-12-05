@@ -36,6 +36,13 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
       openTracking: true,
       clickTracking: true,
       unsubscribeLink: true
+    },
+    feedback: {
+      enabled: true,
+      buttonTypes: ['like' | 'dislike' | 'useful' | 'irrelevant' | 'custom'],
+      customButtons?: Array<{ label: string, value: string, icon?: string }>,
+      placement: 'inline' | 'bottom' | 'both',
+      style: 'buttons' | 'icons' | 'text-links'
     }
   },
   dashboard: {
@@ -93,6 +100,10 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
    - **Personalization**: Customize email for each recipient
    - **Template Rendering**: Render HTML email with newsletter content
+   - **Feedback Buttons**: Embed interactive feedback buttons in each newsletter section
+     - Each section includes feedback buttons (Like/Dislike, Useful/Irrelevant, or custom options)
+     - Buttons link to feedback API endpoints with section identifiers
+     - Feedback is tracked per section and per user
    - **Batch Sending**: Send in batches (respect rate limits)
    - **Tracking**: Add tracking pixels and links
    - **Error Handling**: Retry failed sends with exponential backoff
@@ -102,6 +113,10 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
    - Save newsletter to database
    - Update user's newsletter feed
+   - **Interactive Feedback**: Render feedback buttons in dashboard view
+     - Each section displays feedback buttons
+     - Real-time feedback submission via API
+     - Visual feedback confirmation after submission
    - Invalidate cache if needed
    - Send notification (if enabled)
 
@@ -110,6 +125,7 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
    - Record delivery attempts and results
    - Update newsletter status in database
    - Log metrics for Learning Agent
+   - Track feedback button impressions and clicks
 
 5. **Return**: Delivery results
 

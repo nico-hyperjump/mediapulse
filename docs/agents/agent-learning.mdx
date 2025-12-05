@@ -74,7 +74,18 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
       averageRating: number,
       sentiment: 'positive' | 'negative' | 'neutral',
       commonThemes: Array<{ theme: string, frequency: number, sentiment: string }>,
-      suggestions: Array<{ suggestion: string, priority: 'high' | 'medium' | 'low' }>
+      suggestions: Array<{ suggestion: string, priority: 'high' | 'medium' | 'low' }>,
+      sectionFeedback: Array<{
+        sectionId: string,
+        sectionType: string,
+        likeRate: number,
+        usefulRate: number,
+        totalFeedback: number,
+        trends: {
+          likeRate: 'increasing' | 'decreasing' | 'stable',
+          usefulRate: 'increasing' | 'decreasing' | 'stable'
+        }
+      }>
     },
     agentPerformance: {
       dataCollection: { avgExecutionTime: number, successRate: number, qualityScore: number },
@@ -138,8 +149,16 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
 4. **Feedback Analysis**:
 
    - Aggregate ratings and calculate average
+   - **Section-Level Feedback**: Analyze feedback per newsletter section
+     - Identify which sections receive positive/negative feedback
+     - Track section-specific engagement patterns
+     - Correlate section feedback with content type, topic, or format
    - Use AI to analyze comments for themes and sentiment
    - Extract actionable suggestions
+   - **Feedback Patterns**: Identify trends in user preferences
+     - Which content types are most liked/useful
+     - Which sections need improvement
+     - User preference evolution over time
 
 5. **Agent Performance Analysis**:
 
