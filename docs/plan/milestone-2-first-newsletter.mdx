@@ -1,0 +1,89 @@
+---
+title: Milestone 2 - First Working Newsletter
+---
+
+## Summary
+
+Replace placeholder agents with minimal working versions to produce the first real newsletter.
+
+## Timeline
+
+Weeks 5-6
+
+## Goal
+
+Create the first end-to-end working newsletter using hardcoded/simple data sources, basic content generation, and database delivery.
+
+## Deliverables
+
+### Data Collection Agent (Minimal)
+
+- ✅ Basic Data Collection Agent that:
+  - Accepts ticker as input
+  - Returns hardcoded sample data (3-5 news articles, basic market data)
+  - Stores data in `DataSource` table
+  - Returns structured data for next stage
+- ✅ Simple data structure:
+  - News articles (title, url, snippet)
+  - Market data (price, change, volume)
+- ✅ No external API calls yet (uses mock data)
+
+### Content Generation Agent (Minimal)
+
+- ✅ Basic Content Generation Agent that:
+  - Accepts collected data and user preferences
+  - Uses OpenAI API to generate simple newsletter:
+    - Executive summary (2-3 sentences)
+    - Top 3 news items with brief summaries
+    - Market data summary
+  - Stores newsletter in database
+- ✅ Simple prompt template (no personalization yet)
+- ✅ Basic HTML email template (text-only, no styling)
+- ✅ AI integration package (`packages/ai/`) with:
+  - OpenAI client wrapper
+  - Basic retry logic
+  - Token usage tracking
+
+### Delivery Agent (Minimal)
+
+- ✅ Basic Delivery Agent that:
+  - Saves newsletter to database (already done in Content Gen)
+  - Updates user's newsletter feed
+  - **No email sending yet** (only dashboard delivery)
+- ✅ Newsletter accessible via dashboard
+
+### Scheduler Agent (Update)
+
+- ✅ Newsletter pipeline triggered by scheduler:
+  - Default schedule: Daily at 6 AM
+  - User-defined schedules supported (per newsletter)
+  - Checks data freshness before processing (basic check)
+  - Can trigger immediate data collection if data is stale
+
+### Web Dashboard Updates
+
+- ✅ Newsletter detail page (`/newsletters/[id]`)
+- ✅ Newsletter list on dashboard
+- ✅ Basic newsletter display (HTML rendering)
+
+## Limitations (Acceptable for This Milestone)
+
+- Uses hardcoded/mock data (no real data collection)
+- No analysis (just summarizes news)
+- No personalization (same content for all users)
+- No email delivery (dashboard only)
+- No quality assurance
+- Simple content structure only
+
+## Success Criteria
+
+- ✅ Scheduler runs and produces a newsletter end-to-end
+- ✅ Newsletter contains real AI-generated content (not placeholders)
+- ✅ Newsletter is saved to database with proper structure
+- ✅ User can view newsletter in dashboard
+- ✅ Content is readable and relevant (even if from mock data)
+- ✅ System can generate newsletters for multiple users/tickers
+
+## Next Steps
+
+After this milestone, we have a working newsletter system using mock data. Milestone 3 will replace mock data with real data collection.

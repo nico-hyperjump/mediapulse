@@ -1,0 +1,74 @@
+---
+title: Milestone 12 - Learning Agent (Basic)
+---
+
+## Summary
+
+Implement basic learning agent to collect metrics and provide optimization recommendations.
+
+## Timeline
+
+Weeks 25-26
+
+## Goal
+
+Add metrics collection and basic optimization capabilities.
+
+## Deliverables
+
+### Learning Agent (Basic)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule: Daily at midnight
+  - Operates independently - analyzes all metrics from previous day
+- ✅ **Metrics Collection**:
+  - Engagement metrics (opens, clicks, time spent)
+  - User feedback collection (ratings, comments)
+  - Newsletter performance tracking
+  - Agent performance metrics
+- ✅ **Basic Analysis**:
+  - Engagement rate calculations
+  - Trend detection
+  - Top/low performing content identification
+- ✅ **Optimization Recommendations**:
+  - Basic config optimization suggestions
+  - Simple A/B test analysis
+  - Performance improvement recommendations
+  - Updates agent configs in database (hot-reloadable)
+
+### Database Updates
+
+- ✅ User feedback table (if not exists)
+- ✅ Agent metrics table (if not exists)
+- ✅ Engagement tracking
+
+### Web Dashboard Updates
+
+- ✅ Feedback collection UI (ratings, comments)
+- ✅ Basic analytics dashboard
+- ✅ Admin metrics view
+
+### Delivery Agent (Update)
+
+- ✅ Email tracking (open tracking, click tracking)
+- ✅ Engagement metrics collection
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic metrics only (no advanced analytics)
+- Simple recommendations (no automated updates)
+- No statistical significance testing for A/B tests
+- Manual review of recommendations
+
+## Success Criteria
+
+- ✅ Collects engagement metrics accurately
+- ✅ Tracks user feedback
+- ✅ Generates basic optimization recommendations
+- ✅ A/B test results are tracked
+- ✅ Metrics dashboard displays data correctly
+
+## Next Steps
+
+After this milestone, system collects metrics. Milestone 13 will focus on production hardening.
+

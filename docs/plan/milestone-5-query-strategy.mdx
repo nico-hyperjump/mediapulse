@@ -1,0 +1,66 @@
+---
+title: Milestone 5 - Query Strategy (Basic)
+---
+
+## Summary
+
+Implement basic query strategy to discover entities and generate better search queries.
+
+## Timeline
+
+Weeks 11-12
+
+## Goal
+
+Add entity discovery and intelligent query generation to improve data collection quality.
+
+## Deliverables
+
+### Query Strategy Agent (Basic)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule:
+    - Entity Graph Refresh: Weekly (configurable per ticker)
+    - Query Optimization: Daily (analyzes previous day's performance)
+    - Query Generation: On-demand or when entity graph updates
+  - Operates independently - Data Collection Agent reads queries from database
+- ✅ **Basic Entity Discovery**:
+  - Company name extraction from ticker
+  - Simple competitor identification (hardcoded list or basic API)
+  - No complex entity graph yet
+- ✅ **Query Generation**:
+  - Generate queries from ticker + basic entities
+  - Multiple query variants (3-5 per ticker)
+  - Query prioritization (simple scoring)
+- ✅ **Database Integration**:
+  - Store queries in database (available for Data Collection Agent)
+  - Store discovered entities in database (simple structure)
+  - Link entities to tickers
+  - Data Collection Agent reads latest queries from database
+
+### Data Collection Agent (Enhanced)
+
+- ✅ Use queries from Query Strategy Agent
+- ✅ Execute multiple queries per ticker
+- ✅ Merge results from different queries
+- ✅ Basic query performance tracking
+
+## Limitations (Acceptable for This Milestone)
+
+- Simple entity discovery (no SEC filings parsing yet)
+- Hardcoded competitor lists or basic API
+- No entity relationship graph
+- No query optimization based on historical performance
+- Basic query generation only
+
+## Success Criteria
+
+- ✅ Query Strategy Agent discovers basic entities for test tickers
+- ✅ Generates 5+ relevant queries per ticker
+- ✅ Data collection uses queries and collects more relevant data
+- ✅ Newsletter quality improves (more relevant articles)
+- ✅ Entities are stored and can be retrieved
+
+## Next Steps
+
+After this milestone, data collection is more intelligent. Milestone 6 will add more data sources and better deduplication.

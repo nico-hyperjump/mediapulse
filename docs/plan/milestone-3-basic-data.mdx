@@ -1,0 +1,74 @@
+---
+title: Milestone 3 - Basic Data Collection
+---
+
+## Summary
+
+Replace mock data with real data collection from a single, simple source.
+
+## Timeline
+
+Weeks 7-8
+
+## Goal
+
+Implement real data collection from one reliable source (NewsAPI) to replace hardcoded data.
+
+## Deliverables
+
+### Data Collection Agent (Enhanced)
+
+- ✅ **Independent Scheduling**:
+  - Runs on its own schedule (every 2-4 hours by default, configurable per ticker)
+  - Operates independently - doesn't wait for other agents
+  - Reads latest queries from database (when available)
+- ✅ **NewsAPI integration**:
+  - API client setup
+  - Basic query construction (ticker name search)
+  - Article fetching and parsing
+  - Rate limiting handling
+- ✅ **Basic market data**:
+  - Alpha Vantage API integration (or Yahoo Finance)
+  - Price, change, volume data
+  - Simple error handling
+- ✅ Data storage to `DataSource` table:
+  - News articles with metadata
+  - Market data with timestamps
+  - Timestamps for freshness tracking
+- ✅ Basic deduplication:
+  - URL-based deduplication
+  - Title similarity (simple string matching)
+- ✅ Error handling:
+  - API failure handling
+  - Retry logic with exponential backoff
+  - Graceful degradation (return partial data if some sources fail)
+
+### Query Strategy (Minimal - Hardcoded)
+
+- ✅ Simple query generation:
+  - Ticker name → search query (e.g., "AAPL" → "Apple Inc")
+  - No entity discovery yet
+  - No query optimization yet
+- ✅ Hardcoded query templates
+
+## Limitations (Acceptable for This Milestone)
+
+- Only one news source (NewsAPI)
+- No social media data
+- No earnings or SEC filings
+- Simple query generation (ticker name only)
+- Basic deduplication only
+- No relevance scoring
+
+## Success Criteria
+
+- ✅ Collects 10+ real news articles per ticker per day
+- ✅ Fetches accurate market data
+- ✅ Data is stored correctly in database
+- ✅ Deduplication removes obvious duplicates
+- ✅ Newsletter content uses real collected data
+- ✅ System handles API failures gracefully
+
+## Next Steps
+
+After this milestone, newsletters use real data from one source. Milestone 4 will add basic analysis to provide insights beyond just news summaries.

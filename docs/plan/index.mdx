@@ -4,17 +4,90 @@ title: Development Plan 2026
 
 ## Overview
 
-This document outlines the comprehensive development plan for the AI-Powered Stock Newsletter System throughout 2026. The plan is organized into four quarters, each containing 2-3 milestones with significant, measurable deliverables.
+This document outlines an incremental development plan for the AI-Powered Stock Newsletter System throughout 2026. The plan is organized to ensure that **each milestone produces a working end-to-end system**, even if some features are limited or simplified.
+
+## Development Philosophy
+
+Since the system is modular, each part can be developed independently. The plan follows these principles:
+
+1. **Start Simple**: Each component begins with its minimal viable version
+2. **Incremental Enhancement**: Features are added progressively to each component
+3. **Working System First**: Every milestone produces a functional end-to-end system
+4. **Independent Development**: Components can be developed in parallel when dependencies allow
+5. **Event-Driven Architecture**: Agents run independently on their own schedules, communicating through a shared database and event queue (see [System Flow](/system-flow) for details)
 
 ## Plan Structure
 
-The development plan is organized into the following sections:
+The development plan is organized into incremental milestones:
 
-- **[Q1 2026: Foundation & Core Infrastructure](/plan/q1-foundation)** - Project setup, database foundation, agent framework, and web dashboard
-- **[Q2 2026: Data Collection & Entity Intelligence](/plan/q2-data-collection)** - Query strategy agent, data collection from multiple sources, and advanced features
-- **[Q3 2026: Analysis & Content Generation](/plan/q3-analysis-content)** - Analysis agent, content generation, and quality assurance (Final Development Milestone)
-- **[Q4 2026: Maintenance & Production Operations](/plan/q4-delivery-production)** - Delivery system, scheduler, learning agent, and production maintenance
+### Phase 1: Minimal Viable System (Milestones 1-4)
+
+Build the simplest working version of the entire pipeline
+
+- **[Milestone 1: Foundation & Basic Pipeline](/plan/milestone-1-foundation)** - Database, basic scheduler, minimal agents
+- **[Milestone 2: First Working Newsletter](/plan/milestone-2-first-newsletter)** - End-to-end newsletter generation with hardcoded data
+- **[Milestone 3: Basic Data Collection](/plan/milestone-3-basic-data)** - Single source data collection
+- **[Milestone 4: Basic Analysis & Content](/plan/milestone-4-basic-analysis)** - Simple analysis and content generation
+
+### Phase 2: Core Features (Milestones 5-8)
+
+Enhance each component with core functionality
+
+- **[Milestone 5: Query Strategy (Basic)](/plan/milestone-5-query-strategy)** - Entity discovery and query generation
+- **[Milestone 6: Enhanced Data Collection](/plan/milestone-6-enhanced-data)** - Multiple sources, deduplication, and agent versioning
+- **[Milestone 7: Enhanced Analysis](/plan/milestone-7-enhanced-analysis)** - Multiple analysis types
+- **[Milestone 8: Quality Assurance (Basic)](/plan/milestone-8-quality-assurance)** - Basic validation and compliance
+
+### Phase 3: Advanced Features (Milestones 9-12)
+
+Add advanced capabilities and optimizations
+
+- **[Milestone 9: Enhanced Content Generation](/plan/milestone-9-enhanced-content)** - Personalization and A/B testing
+- **[Milestone 10: Advanced Data Collection](/plan/milestone-10-advanced-data)** - Earnings, SEC filings, advanced processing
+- **[Milestone 11: Enhanced Quality Assurance](/plan/milestone-11-enhanced-qa)** - Fact-checking and advanced validation
+- **[Milestone 12: Learning Agent (Basic)](/plan/milestone-12-learning)** - Metrics collection and basic optimization
+
+### Phase 4: Production Ready (Milestones 13-14)
+
+Production hardening and continuous improvement
+
+- **[Milestone 13: Production Hardening](/plan/milestone-13-production)** - Monitoring, error handling, scalability
+- **[Milestone 14: Advanced Learning](/plan/milestone-14-advanced-learning)** - Advanced analytics and automated optimization
+
+### Supporting Documents
+
 - **[Success Metrics & KPIs](/plan/success-metrics)** - Technical and business metrics for measuring success
 - **[Risk Mitigation](/plan/risk-mitigation)** - Technical and business risks with mitigation strategies
 - **[Dependencies & Prerequisites](/plan/dependencies)** - External services and team requirements
-- **[Review Process](/plan/review-process)** - Quarterly review process and notes
+- **[Review Process](/plan/review-process)** - Milestone review process and notes
+
+## Milestone Progression
+
+Each milestone builds upon the previous ones while maintaining a working system:
+
+<Mermaid
+  chart="
+flowchart TD
+    M1[Milestone 1: Foundation] --> M2[Milestone 2: First Newsletter<br/>works with hardcoded data]
+    M2 --> M3[Milestone 3: Basic Data Collection<br/>replaces hardcoded data]
+    M3 --> M4[Milestone 4: Basic Analysis<br/>adds simple insights]
+    M4 --> M5[Milestone 5: Query Strategy<br/>improves data quality]
+    M5 --> M6[Milestone 6: Enhanced Data<br/>more sources]
+    M6 --> M7[Milestone 7: Enhanced Analysis<br/>deeper insights]
+    M7 --> M8[Milestone 8: Quality Assurance<br/>validates content]
+    M8 --> M9[Milestone 9: Enhanced Content<br/>personalization]
+    M9 --> M10[Milestone 10: Advanced Data<br/>earnings, filings]
+    M10 --> M11[Milestone 11: Enhanced QA<br/>fact-checking]
+    M11 --> M12[Milestone 12: Learning<br/>optimization]
+    M12 --> M13[Milestone 13: Production<br/>hardening]
+    M13 --> M14[Milestone 14: Advanced Learning<br/>self-improvement]
+"
+/>
+
+## Key Principles
+
+1. **Always Working**: Every milestone produces a deployable, working system
+2. **Incremental Value**: Each milestone adds tangible value to users
+3. **Parallel Development**: When dependencies allow, components can be developed in parallel
+4. **Feature Flags**: Use configuration to enable/disable features as they're developed
+5. **Backward Compatible**: New features don't break existing functionality

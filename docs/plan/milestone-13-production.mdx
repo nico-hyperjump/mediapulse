@@ -1,0 +1,109 @@
+---
+title: Milestone 13 - Production Hardening
+---
+
+## Summary
+
+Production readiness: monitoring, error handling, scalability, and reliability improvements.
+
+## Timeline
+
+Weeks 27-28
+
+## Goal
+
+Make the system production-ready with comprehensive monitoring, error handling, and scalability.
+
+## Deliverables
+
+### Infrastructure & Reliability
+
+- ✅ **Monitoring & Observability**:
+  - Application monitoring (error tracking, performance)
+  - Database monitoring
+  - Queue monitoring
+  - Alerting system
+- ✅ **Error Handling**:
+  - Comprehensive error handling across all agents
+  - Error recovery mechanisms
+  - Dead letter queue for failed jobs
+  - Error notification system
+- ✅ **Scalability**:
+  - Horizontal scaling support
+  - Database connection pooling
+  - Queue concurrency optimization
+  - Caching strategy implementation
+- ✅ **Security**:
+  - API security hardening
+  - Data encryption
+  - Rate limiting
+  - Input validation
+
+### Scheduler Agent (Enhanced)
+
+- ✅ Newsletter pipeline enhancements:
+  - Parallel execution support:
+    - Parallel analysis for multiple tickers
+    - Sequential content generation per user (maintained)
+    - Parallel delivery
+  - Data freshness management:
+    - Checks data freshness before analysis
+    - Triggers immediate data collection if data is stale
+    - Handles data collection agent running independently
+- ✅ Better error handling and retries
+- ✅ Pipeline monitoring and metrics
+
+### Independent Agent Scheduling (Architecture)
+
+- ✅ All agents run on independent schedules:
+  - Query Strategy: Weekly/Daily (entity graph vs. queries)
+  - Data Collection: Every 1-4 hours (configurable per ticker)
+  - Newsletter Generation: Daily at 6 AM or user-defined
+  - Learning: Daily at midnight
+- ✅ Event-driven communication through shared database
+- ✅ Agents can be scaled horizontally independently
+
+### Email Delivery
+
+- ✅ **Email Delivery System**:
+  - Resend/SendGrid integration
+  - HTML email rendering
+  - Batch sending with rate limiting
+  - Delivery status tracking
+  - Bounce handling
+  - Unsubscribe management
+
+### Delivery Agent (Enhanced)
+
+- ✅ Full email delivery implementation
+- ✅ Delivery tracking and metrics
+- ✅ Error handling and retries
+
+### Admin Dashboard
+
+- ✅ Admin dashboard (`apps/admin/`) with:
+  - Agent monitoring
+  - System health dashboard
+  - Error logs view
+  - Configuration management
+  - User management
+
+## Limitations (Acceptable for This Milestone)
+
+- Basic monitoring (no advanced analytics)
+- Standard scalability patterns
+- Basic security measures
+
+## Success Criteria
+
+- ✅ System handles errors gracefully
+- ✅ Monitoring provides visibility into system health
+- ✅ Email delivery works reliably (99%+ success rate)
+- ✅ System can handle increased load
+- ✅ Admin dashboard provides necessary controls
+- ✅ All critical errors trigger alerts
+
+## Next Steps
+
+After this milestone, system is production-ready. Milestone 14 will add advanced learning and self-improvement.
+
