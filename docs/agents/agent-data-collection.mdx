@@ -4,7 +4,7 @@ title: Data Collection Agent
 
 ## Purpose
 
-Collect raw data from multiple sources for specified stock tickers within a time window. Handles web scraping, API calls, and data aggregation with intelligent deduplication and relevance scoring.
+Collect raw media data from multiple sources for specified companies within a time window. Handles web scraping, API calls, and data aggregation with intelligent deduplication and relevance scoring.
 
 ## What the Agent Does
 
@@ -13,12 +13,12 @@ Collect raw data from multiple sources for specified stock tickers within a time
    - Uses targeted search queries via news APIs (NewsAPI, Google News API, etc.) when available
    - Leverages RSS feeds with ticker-specific filters
    - Performs targeted web scraping only as fallback or for sources without APIs
-   - Searches for: ticker symbol, company name, competitors, industry keywords, executives, related events
+   - Searches for: company name, competitors, industry keywords, executives, related events
    - Filters by relevance before storing (not storing everything)
 
 2. **Comprehensive Social Media Monitoring**:
 
-   - Monitors ticker mentions directly
+   - Monitors company mentions directly
    - Monitors competitor mentions and comparisons
    - Tracks industry trends and sector discussions
    - Monitors key executives and company personnel
@@ -26,18 +26,13 @@ Collect raw data from multiple sources for specified stock tickers within a time
    - Monitors suppliers and customers (if publicly discussed)
    - Uses intelligent query construction based on entity relationships
 
-3. **Entity Relationship Tracking**:
+3. **Entity Relationship Usage**:
 
-   - Maintains entity graph: competitors, suppliers, customers, executives, industry peers
-   - Uses this graph to expand search queries intelligently
-   - Tracks relationships from SEC filings, company websites, industry databases
+   - Uses entity graph from Query Strategy Agent: competitors, suppliers, customers, executives, industry peers
+   - Expands search queries intelligently based on entity relationships
+   - Note: Entity graph is maintained by Query Strategy Agent, not Data Collection Agent
 
-4. **Market Data Fetching**:
-
-   - Fetches real-time and historical market data (prices, volume, technical indicators)
-   - Provider configurable (Alpha Vantage, Polygon, Yahoo Finance, etc.)
-
-5. **Earnings & SEC Filings**:
+4. **Earnings & SEC Filings** (if applicable):
 
    - Retrieves earnings call transcripts and SEC filings (8-K, 10-Q, 10-K)
    - Extracts entity relationships from filings
@@ -59,7 +54,7 @@ Collect raw data from multiple sources for specified stock tickers within a time
 
 ```typescript
 interface DataCollectionInput {
-  ticker: string; // Stock symbol (e.g., "AAPL", "TSLA")
+  ticker: string; // Company identifier (e.g., "AAPL", "TSLA")
   timeWindow: {
     // Collection period
     start: Date; // Start timestamp
@@ -130,18 +125,6 @@ interface DataCollectionInput {
       minUpvotes: number,             // Quality filter
       minComments: number
     }
-  },
-
-  // Market Data Configuration
-  marketData: {
-    provider: 'alpha_vantage' | 'polygon' | 'yahoo' | 'custom',
-    apiKey: string,                   // From env or config
-    baseUrl: string,                  // API endpoint
-    indicators: string[],              // ['price', 'volume', 'rsi', 'macd', 'sma_50', 'sma_200']
-    timeframes: string[],             // ['1D', '1W', '1M', '3M', '1Y']
-    historicalDays: number,           // How many days of history to fetch
-    cacheEnabled: boolean,
-    cacheTTL: number                  // Seconds
   },
 
   // Earnings Configuration
@@ -256,41 +239,6 @@ interface DataCollectionInput {
         links: string[]
       }
     }>,
-    marketData: {
-      currentPrice: number,
-      change: number,
-      changePercent: number,
-      volume: number,
-      marketCap?: number,
-      indicators: {
-        rsi: {
-          value: number,
-          signal: 'overbought' | 'oversold' | 'neutral'
-        },
-        macd: {
-          value: number,
-          signal: number,
-          histogram: number,
-          trend: 'bullish' | 'bearish' | 'neutral'
-        },
-        sma50: number,
-        sma200: number,
-        ema12?: number,
-        ema26?: number
-      },
-      priceHistory: Array<{
-        date: Date,
-        open: number,
-        high: number,
-        low: number,
-        close: number,
-        volume: number
-      }>,
-      metadata: {
-        lastUpdated: Date,
-        dataQuality: 'high' | 'medium' | 'low'
-      }
-    },
     earnings: Array<{
       id: string,
       quarter: string,                // 'Q1 2024'
@@ -328,7 +276,6 @@ interface DataCollectionInput {
     performance: {
       newsCollectionTime: number,
       socialCollectionTime: number,
-      marketDataTime: number,
       earningsTime: number
     }
   }
@@ -378,15 +325,7 @@ interface DataCollectionInput {
   - Filter by upvotes/comments thresholds
   - Extract post content and engagement
 
-**3c. Market Data Fetching**:
-
-- Authenticate with market data provider API
-- Fetch current quote (price, volume, change)
-- Fetch historical OHLCV data for configured timeframes
-- Calculate technical indicators (RSI, MACD, SMAs) using historical data
-- Cache results if caching enabled
-
-**3d. Earnings Calls**:
+**3c. Earnings Calls** (if applicable):
 
 - Query SEC EDGAR API for recent filings (8-K, 10-Q)
 - Identify earnings-related filings
@@ -451,11 +390,10 @@ flowchart TD
     B2 --> B3[3. Initialize rate limiters]
     B3 --> C[Parallel Collection 4 Workers]
     
-    subgraph Collection [Parallel Collection 4 Workers]
+    subgraph Collection [Parallel Collection 3 Workers]
         direction TB
         C1[News Scraper<br/>Bloomberg<br/>Reuters<br/>WSJ<br/>CNBC] --> C2[Social Monitor<br/>Twitter API<br/>Reddit API]
-        C2 --> C3[Market Data<br/>Alpha Vantage<br/>Polygon]
-        C3 --> C4[Earnings Fetch<br/>SEC EDGAR<br/>Transcripts]
+        C2 --> C3[Earnings Fetch<br/>SEC EDGAR<br/>Transcripts]
     end
     
     C --> Collection

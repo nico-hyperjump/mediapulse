@@ -7,7 +7,7 @@ The project consists of multiple apps, agents, and packages.
 ## Project Structure
 
 ```
-stock-newsletter/
+mediapulse/
 ├── apps/
 │   ├── web/                    # Next.js user dashboard
 │   │   ├── app/
@@ -53,8 +53,8 @@ stock-newsletter/
 Key entities:
 
 - `User` - Recipients with preferences
-- `Ticker` - Stock symbols being monitored
-- `UserTicker` - User-ticker subscriptions with custom schedules
+- `Ticker` - Company identifiers being monitored
+- `UserTicker` - User-company subscriptions with custom schedules
 - `DataSource` - Scraped articles, social posts, market data
 - `Newsletter` - Generated newsletter instances
 - `NewsletterContent` - Sections and insights within newsletters
@@ -66,6 +66,81 @@ Key entities:
 - `AgentExperiment` - Experimental runs and version comparisons
 - `AgentValidation` - Validation checks before version promotion
 - `AgentPromptVersion` - Prompt template versioning
+- `AnalysisTypeRegistry` - Registered analysis types and their metadata
+
+## Analysis Plugin System
+
+The Analysis Agent uses a **plugin-based architecture** that allows analysis types to be dynamically registered, configured, and executed without code changes. This design provides maximum flexibility for adding, removing, or modifying analysis capabilities.
+
+### Plugin Registry
+
+Analysis types are registered in the `AnalysisTypeRegistry` database table, which stores:
+
+- **Analysis Type Metadata**:
+  - `id: string` - Unique identifier (e.g., 'sentiment', 'competitive', 'event')
+  - `name: string` - Human-readable name
+  - `version: string` - Plugin version
+  - `description: string` - What the analysis does
+  - `enabled: boolean` - Whether the analysis type is active
+  - `configSchema: object` - Zod schema for configuration validation
+  - `outputSchema: object` - Zod schema for output validation
+  - `sectionTemplate?: string` - Optional template for content generation
+
+### Dynamic Loading Mechanism
+
+1. **Plugin Discovery**: On initialization, the Analysis Agent queries `AnalysisTypeRegistry` for all enabled analysis types
+2. **Plugin Loading**: Each registered analysis type is loaded with its configuration from `AgentConfig`
+3. **Runtime Execution**: Analysis types are executed in parallel based on the `analysisTypes` parameter
+4. **Hot Reload**: Changes to the registry or configurations trigger agent re-initialization without restart
+
+### Plugin Interface
+
+All analysis plugins must implement the standard interface:
+
+```typescript
+interface AnalysisPlugin {
+  id: string
+  name: string
+  version: string
+  execute: (data: CollectedData, config: AnalysisConfig) => Promise<AnalysisResult>
+  validateConfig: (config: any) => boolean
+  getOutputSchema: () => ZodSchema
+  getSectionTemplate?: () => string // Optional: for content generation
+}
+```
+
+### Adding New Analysis Types
+
+New analysis types can be added through:
+
+1. **Admin Interface**: Register via `/admin/agents/analysis-types` dashboard
+2. **Database Direct**: Insert into `AnalysisTypeRegistry` table
+3. **Configuration**: Add analysis type config to `AgentConfig` for the analysis agent
+
+Once registered, the analysis type is immediately available for use without code deployment.
+
+### Configuration Integration
+
+Analysis type configurations are stored in `AgentConfig` with the following structure:
+
+```typescript
+{
+  analysis: {
+    enabledTypes: string[], // Which analysis types to run
+    [analysisTypeId: string]: {
+      // Type-specific configuration
+      enabled: boolean,
+      // ... type-specific settings
+    }
+  }
+}
+```
+
+The configuration hierarchy applies:
+- User-specific analysis preferences (can enable/disable specific types)
+- Ticker-specific overrides (different analyses per company)
+- Agent-specific defaults from `AgentConfig`
+- System-wide defaults from `SystemConfig`
 
 ## Configuration Management System
 
@@ -80,6 +155,7 @@ Key entities:
   - `UserPreferences` - User-specific preferences
   - `SystemConfig` - Global system settings
   - `ABTestConfig` - A/B testing configurations
+  - `AnalysisTypeRegistry` - Registered analysis types and their metadata (see Analysis Plugin System)
 
 - **Configuration Loading**:
 

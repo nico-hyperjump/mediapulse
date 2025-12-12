@@ -46,6 +46,36 @@ Implement basic quality checks and compliance validation to ensure newsletter qu
 - ✅ Include QA stage in pipeline
 - ✅ Handle QA approval/rejection flow
 
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 8 - Quality Assurance (Basic)
+    dateFormat  YYYY-MM-DD
+    section Quality Assurance Agent
+    Content completeness checks              :a1, 2026-04-23, 1d
+    Length validation                       :a2, after a1, 1d
+    Grammar/spelling check                  :a3, after a2, 2d
+    Consistency checking                    :a4, after a3, 1d
+    Disclaimer verification                 :a5, 2026-04-23, 1d
+    Financial advice detection              :a6, after a5, 1d
+    Data attribution verification           :a7, after a6, 1d
+    Pass/fail decision logic                :a8, after a4, 1d
+    Auto-approval system                    :a9, after a8, 1d
+    Manual review flagging                  :a10, after a9, 1d
+    Pipeline integration                    :a11, after a10, 1d
+    Revision request system                 :a12, after a11, 1d
+    Delivery blocking                       :a13, after a12, 1d
+    section Content Generation
+    Revision request handling               :b1, after a12, 1d
+    QA feedback integration                 :b2, after b1, 1d
+    section Scheduler
+    QA stage integration                    :c1, after a11, 1d
+    Approval/rejection flow                :c2, after c1, 1d
+  "
+/>
+
 ## Limitations (Acceptable for This Milestone)
 
 - Basic fact-checking only (no cross-referencing with sources)

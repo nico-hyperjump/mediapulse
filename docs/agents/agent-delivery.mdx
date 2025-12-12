@@ -8,10 +8,13 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
 ## Inputs
 
-- `newsletter: NewsletterContent` - Approved newsletter from QA Agent
-- `recipients: Array<{ userId: string, email: string, preferences: DeliveryPreferences }>` - Recipients
+- `ticker: string` - Company identifier
+- `userId: string` - User identifier
+- `newsletterId: string` - Newsletter identifier
 - `deliveryChannels: ('email' | 'dashboard')[]` - Where to deliver
 - `scheduleTime?: Date` - Optional scheduled delivery time
+
+**Note**: The agent reads approved newsletter content and recipient information directly from the database. It does not receive data from the QA Agent. The agent works independently and queries the database for the approved newsletter and recipient details.
 
 ## Configurations
 
@@ -95,8 +98,9 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
 ## Process
 
-1. **Initialize**: Load email config, validate recipients
-2. **Email Delivery** (if enabled):
+1. **Initialize**: Load email config
+2. **Read Data**: Query database for approved newsletter and recipient information (independent of QA Agent)
+3. **Email Delivery** (if enabled):
 
    - **Personalization**: Customize email for each recipient
    - **Template Rendering**: Render HTML email with newsletter content
@@ -134,15 +138,17 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 <Mermaid
   chart="
 flowchart TD
-    A[QA Agent] --> B[Delivery Agent]
-    B --> C[Agent receives approved newsletter + recipients]
-    C --> D[Parallel Delivery]
+    A[Scheduler] --> B[Delivery Agent<br/>Triggered independently]
+    B --> C[Agent reads approved newsletter<br/>from Database]
+    C --> C2[Agent reads recipient info<br/>from Database]
+    C2 --> D[Parallel Delivery]
     
     D --> E1[Email Delivery<br/>Personalize for each user<br/>Render HTML template<br/>Batch send rate limited<br/>Add tracking<br/>Retry failures]
     D --> E2[Dashboard Update<br/>Save to database<br/>Update user feeds<br/>Invalidate cache<br/>Send notification]
     
     E1 --> F[Track delivery status]
     E2 --> F
-    F --> G[Return delivery results]
+    F --> G[Write delivery metrics to Database]
+    G --> H[Delivery complete<br/>Metrics available for Learning Agent]
 "
 />

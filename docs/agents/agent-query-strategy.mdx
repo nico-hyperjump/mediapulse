@@ -43,9 +43,9 @@ Dynamically discover entities, maintain entity relationships, generate intellige
 5. **Context-Aware Query Building**:
 
    - Considers recent events (earnings, product launches, news)
-   - Adjusts queries based on market conditions
+   - Adjusts queries based on current events and trends
    - Incorporates seasonal/cyclical patterns
-   - Adapts to breaking news or market volatility
+   - Adapts to breaking news or significant events
 
 ## Inputs
 
@@ -67,7 +67,6 @@ interface QueryStrategyInput {
   };
   context?: {
     recentEvents?: string[]; // Recent significant events
-    marketConditions?: "bull" | "bear" | "volatile" | "stable";
     earningsDate?: Date; // Upcoming or recent earnings (if applicable)
     productLaunches?: Array<{ name: string; date: Date }>;
   };
@@ -150,8 +149,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       industryPeers: {
         enabled: boolean,
         sameSector: boolean,
-        sameMarketCap: boolean,
-        sameRegion?: boolean           // Optional: limit to same market region
+        sameRegion?: boolean           // Optional: limit to same geographic region
       }
     },
     refreshInterval: {
@@ -294,7 +292,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
           value: string
         },
         companyName: string,
-        similarityFactors: string[],    // ['sector', 'marketCap', 'revenue']
+        similarityFactors: string[],    // ['sector', 'revenue', 'industry']
         lastUpdated: Date
       }>
     },

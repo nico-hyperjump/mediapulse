@@ -6,7 +6,7 @@ title: Q2 - Collect & Analyze
 
 ### Summary
 
-Query Strategy Agent (Entity Intelligence)
+Query Strategy Agent
 
 ### Goal
 
@@ -55,7 +55,7 @@ Data Collection Agent - Core Sources
 
 ### Goal
 
-Implement data collection from news sources, social media, and market data APIs.
+Implement data collection from news sources and social media.
 
 ### Deliverables
 
@@ -68,16 +68,11 @@ Implement data collection from news sources, social media, and market data APIs.
     - Reuters scraping
     - WSJ scraping (if accessible)
     - CNBC scraping
-  - RSS feed parsing with ticker filtering
+  - RSS feed parsing with company filtering
 - ✅ Social media monitoring:
   - Twitter/X API integration (v2)
   - Reddit API integration
   - Query-based search with quality filters
-- ✅ Market data integration:
-  - Alpha Vantage API integration
-  - Polygon.io API integration (fallback)
-  - Yahoo Finance API integration (fallback)
-  - Technical indicator calculation (RSI, MACD, SMAs)
 - ✅ Rate limiting and retry mechanisms per source
 - ✅ Data deduplication system:
   - Title similarity matching
@@ -89,9 +84,8 @@ Implement data collection from news sources, social media, and market data APIs.
 
 ### Success Criteria
 
-- Collects 50+ news articles per ticker per day
-- Collects 100+ social media posts per ticker per day
-- Fetches accurate market data with technical indicators
+- Collects 50+ news articles per company per day
+- Collects 100+ social media posts per company per day
 - Deduplication removes 90%+ of duplicates
 - Relevance scoring filters low-quality content effectively
 
@@ -155,37 +149,30 @@ Weeks 25-28
 
 ### Goal
 
-Build comprehensive analysis capabilities (technical, fundamental, competitive, sentiment).
+Build comprehensive analysis capabilities (competitive, sentiment, event/context).
 
 ### Deliverables
 
 - ✅ Analysis Agent implementation (`packages/agents/analysis/`)
-- ✅ Technical analysis module:
-  - Technical indicator calculations (RSI, MACD, SMA, EMA, Bollinger Bands)
-  - Support and resistance level identification
-  - Trend analysis and direction detection
-  - Multi-timeframe analysis (1D, 1W, 1M, 3M)
-  - AI-powered technical summary generation
-- ✅ Fundamental analysis module:
-  - Financial metrics extraction (P/E, P/B, ROE, ROA, Debt/Equity)
-  - Revenue growth analysis
-  - Peer comparison system
-  - Industry benchmarking
-  - Valuation assessment (undervalued/fair/overvalued)
-  - AI-powered fundamental summary
 - ✅ Competitive analysis module:
   - Peer group identification
-  - Metric comparison (market cap, revenue, profit margin, growth)
-  - Industry trend analysis
-  - Market share assessment
+  - Media coverage comparison across competitors
+  - Industry trend analysis in media coverage
+  - Competitive positioning assessment
   - AI-powered competitive summary
 - ✅ Sentiment analysis module:
   - News sentiment analysis (AI-powered)
   - Social media sentiment analysis
-  - Analyst rating aggregation
   - Weighted sentiment calculation with time decay
   - Sentiment trend detection
   - AI-powered sentiment summary
+- ✅ Event/context analysis module:
+  - External event identification (natural disasters, political changes, regulatory updates, economic shifts, social movements)
+  - Relevance scoring for events
+  - Impact assessment (operations, reputation, strategy)
+  - Early warning signal detection
+  - Opportunity identification
+  - AI-powered event summary
 - ✅ Insight extraction system:
   - Cross-analysis insight identification
   - Priority scoring for insights
@@ -195,8 +182,7 @@ Build comprehensive analysis capabilities (technical, fundamental, competitive, 
 
 ### Success Criteria
 
-- Generates accurate technical analysis for test tickers
-- Calculates fundamental metrics correctly
-- Identifies peer groups and performs comparisons
+- Identifies peer groups and performs media coverage comparisons
 - Sentiment scores align with manual review
+- Events are identified accurately with appropriate relevance scores
 - Insights are relevant and actionable

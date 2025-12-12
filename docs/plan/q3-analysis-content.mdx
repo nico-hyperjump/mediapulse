@@ -25,14 +25,16 @@ Generate personalized newsletter content from analysis results with AI-powered i
   - Token usage tracking
   - Response caching
   - Cost optimization
-- ✅ Newsletter section generation:
-  - Executive summary generation (2-3 sentences)
-  - Key insights extraction (top 3-5 with priorities)
-  - Technical analysis section
-  - Fundamental analysis section
-  - Competitive landscape section
-  - Sentiment section
+- ✅ Dynamic newsletter section generation:
+  - Executive summary generation (2-3 sentences, aggregates all analysis types)
+  - Key insights extraction (top 3-5 with priorities, across all analysis plugins)
+  - Dynamic analysis sections (generated based on available analysis plugin results):
+    - Competitive landscape section (from competitive analysis plugin)
+    - Sentiment section (from sentiment analysis plugin)
+    - Event/context section (from event analysis plugin)
+    - Additional sections for any registered analysis plugins
   - Action items generation (optional)
+  - Section mapping system for analysis plugins
 - ✅ Personalization system:
   - User preference integration
   - Detail level adjustment (high/medium/low)

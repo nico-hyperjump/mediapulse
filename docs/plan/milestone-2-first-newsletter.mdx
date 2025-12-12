@@ -20,23 +20,25 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 
 - ✅ Basic Data Collection Agent that:
   - Accepts ticker as input
-  - Returns hardcoded sample data (3-5 news articles, basic market data)
-  - Stores data in `DataSource` table
+  - Returns hardcoded sample data (3-5 news articles)
+  - Stores data in `DataSource` table (table created in this milestone)
   - Returns structured data for next stage
 - ✅ Simple data structure:
   - News articles (title, url, snippet)
-  - Market data (price, change, volume)
 - ✅ No external API calls yet (uses mock data)
+- ✅ `DataSource` table schema:
+  - Basic fields: `id`, `tickerId`, `type` (e.g., 'news'), `title`, `url`, `snippet`, `collectedAt`, `createdAt`
 
 ### Content Generation Agent (Minimal)
 
 - ✅ Basic Content Generation Agent that:
-  - Accepts collected data and user preferences
+  - Accepts collected data (reads from `DataSource` table) and user preferences
   - Uses OpenAI API to generate simple newsletter:
     - Executive summary (2-3 sentences)
     - Top 3 news items with brief summaries
-    - Market data summary
-  - Stores newsletter in database
+  - Stores newsletter in database:
+    - Creates `Newsletter` record with `userId` and `tickerId`
+    - Creates `NewsletterContent` record with generated HTML content
 - ✅ Simple prompt template (no personalization yet)
 - ✅ Basic HTML email template (text-only, no styling)
 - ✅ AI integration package (`packages/ai/`) with:
@@ -47,18 +49,22 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 ### Delivery Agent (Minimal)
 
 - ✅ Basic Delivery Agent that:
-  - Saves newsletter to database (already done in Content Gen)
-  - Updates user's newsletter feed
+  - Verifies newsletter is properly associated with user (ensures `Newsletter.userId` is set correctly)
+  - Ensures newsletter is ready for dashboard display (content exists in `NewsletterContent`)
   - **No email sending yet** (only dashboard delivery)
-- ✅ Newsletter accessible via dashboard
+  - **No status field needed yet** (newsletters are immediately available once created)
+- ✅ Newsletter accessible via dashboard (users can view newsletters filtered by their `userId`)
 
 ### Scheduler Agent (Update)
 
 - ✅ Newsletter pipeline triggered by scheduler:
   - Default schedule: Daily at 6 AM
-  - User-defined schedules supported (per newsletter)
-  - Checks data freshness before processing (basic check)
-  - Can trigger immediate data collection if data is stale
+  - User-defined schedules supported (per newsletter via `UserTicker` configuration)
+  - Checks data freshness before processing:
+    - Checks if `Newsletter` exists for user-ticker combination with `createdAt` less than 24 hours ago
+    - If newsletter is fresh, skips processing
+    - If no newsletter exists or newsletter is stale (>24 hours old), proceeds with pipeline
+  - Can trigger immediate data collection if needed (checks `DataSource` table for recent data for the ticker)
 
 ### Web Dashboard Updates
 
@@ -66,21 +72,56 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 - ✅ Newsletter list on dashboard
 - ✅ Basic newsletter display (HTML rendering)
 
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 2 - First Working Newsletter
+    dateFormat  YYYY-MM-DD
+    section Data Collection Agent
+    DataSource table creation                :a1, 2026-01-29, 1d
+    Data Collection Agent (mock data)        :a2, after a1, 3d
+    DataSource table integration             :a3, after a2, 1d
+    section AI Integration
+    AI package setup                         :b1, 2026-01-29, 2d
+    OpenAI client wrapper                    :b2, after b1, 2d
+    Retry logic & token tracking             :b3, after b2, 1d
+    section Content Generation
+    Content Generation Agent                 :c1, after a3, 3d
+    Prompt template creation                 :c2, after c1, 1d
+    HTML email template                      :c3, after c2, 1d
+    section Delivery Agent
+    Delivery Agent implementation            :d1, after c3, 2d
+    Newsletter status updates                :d2, after d1, 1d
+    section Scheduler Updates
+    Pipeline integration                     :e1, after c3, 2d
+    Schedule configuration                   :e2, after e1, 1d
+    section Web Dashboard
+    Newsletter detail page                   :f1, after c3, 2d
+    Newsletter list view                    :f2, after f1, 1d
+    HTML rendering                          :f3, after f2, 1d
+  "
+/>
+
 ## Limitations (Acceptable for This Milestone)
 
-- Uses hardcoded/mock data (no real data collection)
-- No analysis (just summarizes news)
-- No personalization (same content for all users)
-- No email delivery (dashboard only)
-- No quality assurance
-- Simple content structure only
+- Uses hardcoded/mock data (no real data collection from external APIs)
+- No analysis stage (just summarizes news directly)
+- No personalization (same content for all users, ignores user preferences)
+- No email delivery (dashboard only - newsletters stored in database but not sent)
+- No quality assurance stage (content generated directly without validation)
+- Simple content structure only (executive summary + top 3 news items)
+- `DataSource` table has minimal schema (only essential fields for mock data)
 
 ## Success Criteria
 
+- ✅ `DataSource` table created and migrations run successfully
 - ✅ Scheduler runs and produces a newsletter end-to-end
 - ✅ Newsletter contains real AI-generated content (not placeholders)
-- ✅ Newsletter is saved to database with proper structure
-- ✅ User can view newsletter in dashboard
+- ✅ Newsletter is saved to database with proper structure (`Newsletter` and `NewsletterContent` tables)
+- ✅ Data flows correctly: Data Collection → stores in `DataSource` → Content Generation reads from `DataSource` → stores in `Newsletter`/`NewsletterContent` → Delivery marks as ready
+- ✅ User can view newsletter in dashboard (filtered by `userId`)
 - ✅ Content is readable and relevant (even if from mock data)
 - ✅ System can generate newsletters for multiple users/tickers
 

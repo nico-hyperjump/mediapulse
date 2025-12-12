@@ -10,6 +10,7 @@ The system uses a **modular, event-driven architecture** where agents run indepe
 - **Reliability**: Failures in one agent don't block others
 - **Flexibility**: Each agent runs on its optimal schedule
 - **Modularity**: Agents are loosely coupled and can be updated independently
+- **Extensibility**: Plugin-based architecture allows dynamic addition/removal of capabilities (e.g., analysis types) without code changes
 
 ## Agent Schedules & Independence
 
@@ -23,10 +24,10 @@ flowchart TB
     
     subgraph Newsletter [Newsletter Generation Pipeline]
         Scheduler[Scheduler Agent<br/>• Daily at 6 AM<br/>• Or user-defined schedule]
-        Analysis[Analysis Agent<br/>• Triggered by Scheduler<br/>• Reads collected data from DB]
-        Content[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Sequential per user]
-        QA[Quality Assurance Agent<br/>• Triggered by Content Gen]
-        Delivery[Delivery Agent<br/>• Triggered by QA approval]
+        Analysis[Analysis Agent<br/>• Triggered by Scheduler<br/>• Reads collected data from DB<br/>• Works independently]
+        Content[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Sequential per user<br/>• Works independently]
+        QA[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Works independently]
+        Delivery[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Works independently]
     end
     
     subgraph Background [Background Agents]
@@ -37,10 +38,16 @@ flowchart TB
     DC -->|Writes collected<br/>data to DB| DB
     DB -->|Reads queries| DC
     DB -->|Reads collected data| Analysis
-    Scheduler --> Analysis
-    Analysis --> Content
-    Content --> QA
-    QA --> Delivery
+    Scheduler -->|Triggers| Analysis
+    Analysis -->|Writes analysis<br/>results to DB| DB
+    DB -->|Reads analysis| Content
+    Scheduler -->|Triggers| Content
+    Content -->|Writes newsletter<br/>to DB| DB
+    DB -->|Reads newsletter| QA
+    Scheduler -->|Triggers| QA
+    QA -->|Writes approval<br/>status to DB| DB
+    DB -->|Reads approved<br/>newsletter| Delivery
+    Scheduler -->|Triggers| Delivery
     Delivery -->|Writes metrics| DB
     Learning -->|Reads metrics<br/>Updates configs| DB
 "
@@ -117,14 +124,14 @@ flowchart TD
     A[Newsletter Generation Pipeline<br/>Triggered by Schedule<br/>or Manual trigger] --> B[For each user-ticker<br/>subscription]
     B --> C[Check Data Freshness<br/>in Database]
     C --> D{Data Fresh<br/>enough?}
-    D -->|Yes<br/>< 4 hours old| E[Analysis Agent<br/>• Reads collected data<br/>• Technical analysis<br/>• Fundamental analysis<br/>• Sentiment analysis]
+    D -->|Yes<br/>< 4 hours old| E[Analysis Agent<br/>• Loads enabled analysis plugins<br/>• Reads collected data<br/>• Executes registered analysis types<br/>• Dynamic parallel execution]
     D -->|No| F[Trigger Data Collection<br/>Agent immediately]
     F --> E
-    E --> G[Store Analysis Results<br/>in Database]
-    G --> H[Content Generation Agent<br/>• Sequential per user<br/>• Reads analysis + user prefs<br/>• Generates newsletter]
-    H --> I[Quality Assurance Agent<br/>• Validates content<br/>• Checks compliance]
+    E --> G[Store Analysis Results<br/>in Database<br/>Generic structure with all types]
+    G --> H[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Reads user prefs from DB<br/>• Generates newsletter<br/>• Writes newsletter to DB]
+    H --> I[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Validates content<br/>• Checks compliance<br/>• Writes approval status to DB]
     I --> J{Approved?}
-    J -->|Yes| K[Delivery Agent<br/>• Sends email<br/>• Updates dashboard]
+    J -->|Yes| K[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Sends email<br/>• Updates dashboard<br/>• Writes metrics to DB]
     J -->|No| H
     K --> L[Store Delivery Metrics<br/>in Database]
 "
@@ -166,30 +173,37 @@ sequenceDiagram
         DC->>DB: Store fresh data
     end
 
-    Scheduler->>Analysis: Trigger analysis
+    Scheduler->>Analysis: Trigger analysis (independent execution)
     Analysis->>DB: Read collected data
+    Analysis->>Analysis: Perform analysis
     Analysis->>DB: Store analysis results
 
-    Analysis->>Content: Trigger content generation
-    Content->>DB: Read analysis + user prefs
+    Scheduler->>Content: Trigger content generation (independent execution)
+    Content->>DB: Read analysis results
+    Content->>DB: Read user prefs
     Content->>Content: Generate newsletter
-    Content->>QA: Newsletter draft
+    Content->>DB: Store newsletter draft
 
+    Scheduler->>QA: Trigger QA (independent execution)
+    QA->>DB: Read newsletter draft
     QA->>QA: Validate content
+    QA->>DB: Store approval status
     alt Approved
-        QA->>Delivery: Approved newsletter
+        Scheduler->>Delivery: Trigger delivery (independent execution)
+        Delivery->>DB: Read approved newsletter
+        Delivery->>Delivery: Send email
         Delivery->>DB: Store delivery metrics
         Delivery->>User: Newsletter with feedback buttons
         User->>DB: Submit section feedback (Like/Dislike, Useful/Irrelevant)
     else Not Approved
-        QA->>Content: Request revision
+        Note over Content: Scheduler may retry content generation
     end
 
     Note over Learning: Daily midnight: Learning
     Learning->>DB: Read all metrics + section feedback
-    Learning->>DB: Analyze section feedback patterns
+    Learning->>Learning: Analyze patterns
     Learning->>DB: Update agent configs
-    Learning->>QS: Update query strategies
+    Note over QS: Query Strategy reads updated configs from DB on next run
 
 "
 />
@@ -237,7 +251,9 @@ flowchart LR
 ### 1. **Loose Coupling**
 
 - Agents don't directly call each other
-- Communication through shared database and event queue
+- Agents don't receive data from other agents
+- All communication through shared database
+- Agents read from and write to the database independently
 - Agents can be updated/deployed independently
 
 ### 2. **Independent Scheduling**
@@ -275,6 +291,8 @@ flowchart LR
 - Can be deployed independently
 - Configuration stored in database (hot-reloadable)
 - Versioned agent deployments
+- **Plugin-based architecture**: Analysis types are plugins registered in the database, allowing addition/removal without code changes
+- Dynamic component loading: Agents discover and load components (analysis types, sections) at runtime
 
 ## Error Handling & Resilience
 

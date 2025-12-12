@@ -40,18 +40,62 @@ Implement collection and processing of earnings calls and SEC filings for deeper
   - Extract executive information
   - Build entity relationships from filings
 
-### Analysis Agent (Enhanced)
+### Analysis Agent (New Plugin)
 
-- ✅ **Earnings Analysis**:
-  - Compare actual vs expected metrics
-  - Guidance analysis
-  - Earnings trend analysis
-- ✅ Use SEC filing data in fundamental analysis
+- ✅ **New Analysis Plugin - Earnings Analysis**:
+  - Extract key insights from earnings calls
+  - Identify strategic direction and priorities
+  - Analyze management commentary for sentiment
+  - Registered as new plugin in `AnalysisTypeRegistry`
+  - Demonstrates plugin system flexibility (new analysis type added via configuration)
+- ✅ Use SEC filing data for entity discovery and relationship mapping
+- ✅ Plugin system supports multiple analysis types running in parallel
 
 ### Content Generation Agent (Update)
 
-- ✅ Include earnings insights in newsletter
-- ✅ Reference SEC filing data in analysis
+- ✅ Dynamic section generation for earnings analysis plugin:
+  - Automatic section creation for earnings analysis
+  - Section template for earnings insights
+  - Integration with existing analysis sections
+- ✅ Include earnings insights in newsletter (dynamically when plugin results available)
+- ✅ Reference entity relationships discovered from SEC filings
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 10 - Advanced Data Collection
+    dateFormat  YYYY-MM-DD
+    section Data Collection Agent
+    SEC EDGAR API integration                :a1, 2026-05-21, 2d
+    Earnings filing retrieval               :a2, after a1, 1d
+    Transcript fetching                     :a3, after a2, 2d
+    AI transcript summarization             :a4, after a3, 2d
+    Key metrics extraction                  :a5, after a4, 2d
+    SEC filings retrieval (8-K, 10-Q, 10-K):a6, after a1, 2d
+    Entity relationship extraction          :a7, after a6, 2d
+    Filing metadata extraction              :a8, after a7, 1d
+    Entity extraction from content         :a9, 2026-05-21, 2d
+    Language detection                      :a10, after a9, 1d
+    Metadata extraction                     :a11, after a10, 1d
+    Sentiment pre-calculation               :a12, after a11, 1d
+    section Query Strategy
+    Competitor extraction from 10-K         :b1, after a7, 2d
+    Executive information extraction        :b2, after b1, 1d
+    Entity relationship building            :b3, after b2, 2d
+    section Analysis Agent
+    Earnings analysis plugin                :c1, after a5, 2d
+    Plugin registration                     :c2, after c1, 1d
+    Strategic direction identification      :c3, after c2, 1d
+    Management commentary analysis          :c4, after c3, 1d
+    SEC data for entity mapping             :c5, after b3, 1d
+    section Content Generation
+    Earnings section mapping                :d1, after c2, 1d
+    Earnings section template               :d2, after d1, 1d
+    Entity relationship references          :d3, after c5, 1d
+  "
+/>
 
 ## Limitations (Acceptable for This Milestone)
 
@@ -64,9 +108,11 @@ Implement collection and processing of earnings calls and SEC filings for deeper
 - ✅ Successfully retrieves earnings transcripts
 - ✅ Extracts key metrics with 90%+ accuracy
 - ✅ Processes SEC filings and extracts entities
-- ✅ Earnings insights are included in newsletters
+- ✅ Earnings analysis plugin is registered and functional
+- ✅ Earnings insights are dynamically included in newsletters (when plugin results available)
+- ✅ Plugin system demonstrates ease of adding new analysis types
 - ✅ Entity discovery improves with filing data
 
 ## Next Steps
 
-After this milestone, data collection includes earnings and filings. Milestone 11 will enhance QA with fact-checking.
+After this milestone, data collection includes earnings and filings. The plugin system now supports four analysis plugins (sentiment, competitive, event, earnings), demonstrating the flexibility to add new analysis capabilities without core code changes. Milestone 11 will enhance QA with fact-checking.

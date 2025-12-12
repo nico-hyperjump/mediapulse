@@ -12,69 +12,132 @@ Weeks 9-10
 
 ## Goal
 
-Add simple analysis (sentiment and basic technical) and enhance content generation to include insights.
+Build the plugin-based analysis system infrastructure and implement initial analysis plugins (sentiment and event/context). Enhance content generation to dynamically include insights from available analysis plugins.
 
 ## Deliverables
 
-### Analysis Agent (Minimal)
+### Analysis Agent (Plugin System Foundation)
 
-- ✅ **Sentiment Analysis**:
-  - AI-powered sentiment analysis of news articles
-  - Aggregate sentiment score (positive/negative/neutral)
-  - Simple sentiment trend (improving/declining/stable)
-- ✅ **Basic Technical Analysis**:
-  - Price change calculation
-  - Simple moving average (if historical data available)
-  - Volume analysis (high/normal/low)
+- ✅ **Plugin System Infrastructure**:
+  - Analysis plugin interface definition
+  - Plugin registry system (`AnalysisTypeRegistry` table)
+  - Dynamic plugin loading mechanism
+  - Plugin configuration system
+  - Generic analysis result storage structure
+- ✅ **Initial Analysis Plugins**:
+  - **Sentiment Analysis Plugin**:
+    - AI-powered sentiment analysis of news articles
+    - Aggregate sentiment score (positive/negative/neutral)
+    - Simple sentiment trend (improving/declining/stable)
+  - **Basic Event/Context Analysis Plugin**:
+    - Identify external events mentioned in media (natural disasters, political changes, regulatory updates)
+    - Basic relevance scoring for events
+    - Simple impact assessment (high/medium/low)
 - ✅ Analysis result storage:
-  - Store analysis results in database
+  - Generic storage structure supporting any plugin output
+  - Store analysis results in database with plugin metadata
   - Link to source data
 - ✅ Simple insight extraction:
-  - Identify top 3 insights from analysis
-  - Priority scoring (basic)
+  - Cross-plugin insight identification
+  - Identify top 3 insights from all analysis plugins
+  - Priority scoring (basic - based on analysis confidence scores and cross-plugin relevance)
 
 ### Content Generation Agent (Enhanced)
 
+- ✅ Dynamic section generation system:
+  - Section mapping configuration for analysis plugins
+  - Dynamic section resolution based on available analysis results
+  - Conditional section rendering (only show sections with results)
+  - Fallback to basic content structure if no analysis results are available
 - ✅ Enhanced newsletter structure:
-  - Executive summary with sentiment
-  - Key insights section (from analysis)
+  - Executive summary (aggregates all analysis insights)
+  - Key insights section (from all analysis plugins)
+  - Dynamic analysis sections (sentiment, event/context based on available plugins)
   - News summary with sentiment indicators
-  - Market data with technical indicators
 - ✅ Improved prompts:
-  - Include analysis results in prompts
-  - Generate actionable insights
+  - Include analysis results from all plugins in prompts
+  - Generate actionable insights across analysis types
+  - Plugin-aware prompt construction
 - ✅ Better formatting:
-  - Structured sections
+  - Structured sections with dynamic content
   - Improved HTML template (basic styling)
+  - Basic template system for plugin-specific sections (simple string interpolation, advanced templating in later milestones)
 
 ### Database Updates
 
-- ✅ Add analysis result storage (if not already in schema)
-- ✅ Link analysis to newsletters
+- ✅ Add `AnalysisTypeRegistry` table for plugin registration:
+  - Stores plugin metadata (name, version, enabled status, configuration)
+  - Links to plugin implementation code
+- ✅ Add generic analysis result storage (supports any plugin output structure):
+  - Stores analysis results with plugin type reference
+  - Links to source data via foreign keys
+  - Flexible JSON structure for plugin-specific results
+- ✅ Link analysis results to newsletters:
+  - Many-to-many relationship between analysis results and newsletters
+  - Allows multiple analysis runs to contribute to a single newsletter
+- ✅ Add plugin configuration storage in `AgentConfig`:
+  - Plugin-specific settings (e.g., sentiment thresholds, event relevance scores)
+  - Per-ticker plugin enablement flags
 
 ### Scheduler Agent (Update)
 
 - ✅ Newsletter pipeline enhancements:
   - Checks data freshness before triggering analysis
-  - Can trigger immediate data collection if data is stale (< 4 hours old)
+  - Can trigger immediate data collection if data is stale (> 4 hours old)
   - Triggers Analysis Agent after data freshness check
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 4 - Basic Analysis & Enhanced Content
+    dateFormat  YYYY-MM-DD
+    section Analysis Agent
+    Plugin system infrastructure             :a1, 2026-02-26, 2d
+    Plugin registry code implementation      :a2, after c1, 1d
+    Dynamic plugin loading                   :a3, after a2, 1d
+    Sentiment analysis plugin                :a4, after a3, 2d
+    Event/context analysis plugin            :a5, after a3, 2d
+    Generic result storage code              :a6, after c2, 1d
+    Cross-plugin insight extraction          :a7, after a6, 1d
+    section Content Generation
+    Dynamic section mapping system           :b1, after a7, 1d
+    Section resolution logic                 :b2, after b1, 1d
+    Enhanced newsletter structure            :b3, after b2, 1d
+    Improved prompts with analysis           :b4, after b3, 1d
+    HTML template styling                    :b5, after b3, 1d
+    section Database
+    AnalysisTypeRegistry table              :c1, 2026-02-26, 1d
+    Generic analysis result storage          :c2, after c1, 1d
+    Link analysis to newsletters             :c3, after c2, 1d
+    Plugin config in AgentConfig             :c4, after c1, 1d
+    section Scheduler
+    Data freshness checks                    :d1, after a7, 1d
+    Analysis trigger integration             :d2, after d1, 1d
+  "
+/>
 
 ## Limitations (Acceptable for This Milestone)
 
-- Only sentiment and basic technical analysis
-- No fundamental analysis
-- No competitive analysis
-- Simple insight extraction
-- No advanced technical indicators
+- Plugin system supports basic plugin interface (advanced features in later milestones)
+- Only two initial plugins: sentiment and basic event/context analysis
+- No competitive analysis plugin yet
+- Simple insight extraction (cross-plugin insights are basic)
+- Basic event identification only
+- Section templates are simple (advanced templating in later milestones)
 
 ## Success Criteria
 
-- ✅ Analysis agent processes collected data
-- ✅ Sentiment scores are calculated and stored
-- ✅ Basic technical indicators are calculated
-- ✅ Content generation includes analysis insights
-- ✅ Newsletters show sentiment and basic technical data
+- ✅ Plugin system infrastructure is functional
+- ✅ Analysis plugins can be registered and loaded dynamically
+- ✅ Analysis agent processes collected data using registered plugins
+- ✅ Sentiment analysis plugin calculates and stores sentiment scores
+- ✅ Event/context analysis plugin identifies and assesses events
+- ✅ Content generation dynamically includes sections for available analysis plugins
+- ✅ Newsletters show sentiment and event/context information
 - ✅ Insights are relevant and actionable
+- ✅ New analysis plugins can be added via database registration (infrastructure ready)
 
 ## Next Steps
 

@@ -4,15 +4,15 @@ title: Content Generation Agent
 
 ## Purpose
 
-Transform analysis results into a well-structured, personalized newsletter with executive-friendly format.
+Transform analysis results into a well-structured, personalized newsletter with executive-friendly format. The agent dynamically generates sections based on available analysis results, allowing newsletters to adapt automatically when new analysis types are added or removed.
 
 ## Inputs
 
-- `ticker: string` - Stock symbol
-- `analysisResults: AnalysisOutput` - Output from Analysis Agent
-- `user: { id: string, preferences: UserPreferences, name: string }` - Recipient information
+- `ticker: string` - Company identifier
+- `userId: string` - User identifier
 - `newsletterType: 'daily' | 'weekly' | 'event-driven'` - Newsletter type
-- `previousNewsletter?: Newsletter` - Optional: previous newsletter for context
+
+**Note**: The agent reads analysis results and user preferences directly from the database. It does not receive data from the Analysis Agent. The agent works independently and queries the database for the latest analysis results and user preferences.
 
 ## Configurations
 
@@ -30,19 +30,22 @@ Transform analysis results into a well-structured, personalized newsletter with 
     length: 'brief' | 'moderate' | 'detailed'
   },
   structure: {
-    sections: [
-      'executiveSummary',
-      'keyInsights',
-      'technicalAnalysis',
-      'fundamentalAnalysis',
-      'competitiveLandscape',
-      'sentiment',
-      'actionItems'
-    ],
-    maxLength: {
-      executiveSummary: 200,
-      keyInsights: 500,
-      eachSection: 300
+    sections: Array<{
+      id: string,                                    // Unique section identifier
+      type: 'executiveSummary' | 'keyInsights' | 'analysisSection' | 'actionItems',
+      analysisType?: string,                         // Maps to analysis type for dynamic sections (e.g., 'sentiment', 'competitive')
+      enabled: boolean,                              // Whether to include this section
+      maxLength: number,                             // Maximum length for this section
+      template?: string,                             // Optional custom template
+      title?: string                                 // Optional custom title
+    }>,
+    sectionMapping: {                                // Maps analysis types to section IDs
+      [analysisType: string]: string                 // e.g., { 'sentiment': 'sentimentSection', 'competitive': 'competitiveLandscape' }
+    },
+    defaultSections: {                               // Default section configuration
+      executiveSummary: { maxLength: 200, enabled: true },
+      keyInsights: { maxLength: 500, enabled: true },
+      actionItems: { maxLength: 300, enabled: true }
     }
   },
   personalization: {
@@ -59,6 +62,8 @@ Transform analysis results into a well-structured, personalized newsletter with 
 
 ## Outputs
 
+The newsletter structure is dynamic and adapts to available analysis results:
+
 ```typescript
 {
   agentId: 'content-generation',
@@ -71,6 +76,7 @@ Transform analysis results into a well-structured, personalized newsletter with 
     title: string,
     date: Date,
     sections: {
+      // Always present sections
       executiveSummary: {
         content: string,
         keyPoints: string[]
@@ -79,29 +85,17 @@ Transform analysis results into a well-structured, personalized newsletter with 
         title: string,
         description: string,
         priority: 'high' | 'medium' | 'low',
-        source: string
+        source: string,
+        analysisType: string                    // Which analysis type generated this insight
       }>,
-      technicalAnalysis: {
-        summary: string,
-        chartData: object, // For visualization
-        keyMetrics: Array<{ label: string, value: string }>
+      // Dynamic sections based on available analyses
+      [sectionId: string]: {                   // Dynamic: sections generated from analysis results
+        analysisType: string,                   // Which analysis type this section represents
+        content: string,                        // Generated content
+        data: any                               // Type-safe data from analysis results
       },
-      fundamentalAnalysis: {
-        summary: string,
-        metrics: Array<{ metric: string, value: number, vsPeer: string }>,
-        valuation: string
-      },
-      competitiveLandscape: {
-        summary: string,
-        marketPosition: string,
-        peerComparison: Array<{ ticker: string, comparison: string }>
-      },
-      sentiment: {
-        overall: string,
-        trend: string,
-        keyDrivers: string[]
-      },
-      actionItems: Array<{
+      // Optional sections
+      actionItems?: Array<{
         action: string,
         rationale: string,
         priority: 'high' | 'medium' | 'low'
@@ -111,7 +105,8 @@ Transform analysis results into a well-structured, personalized newsletter with 
       wordCount: number,
       readingTime: number,
       personalizationScore: number,
-      abTestVariant?: string
+      abTestVariant?: string,
+      includedAnalysisTypes: string[]           // Which analysis types were included
     }
   },
   rawContent: string, // Full markdown/HTML
@@ -120,75 +115,109 @@ Transform analysis results into a well-structured, personalized newsletter with 
 }
 ```
 
+**Dynamic Section Generation**:
+- Sections are generated only for analysis types that have results available
+- Section templates are resolved from the analysis plugin's `getSectionTemplate()` method or configuration
+- If an analysis type has no results, its corresponding section is omitted
+- New analysis types automatically get sections generated when their results are available
+
 **Process**:
 
-1. **Initialize**: Load user preferences, newsletter template, AI config
-2. **Context Building**:
+1. **Initialize**: 
+   - Load newsletter template, AI config
+   - Load section configuration and mapping from database
+
+2. **Read Data**: 
+   - Query database for analysis results and user preferences (independent of Analysis Agent)
+   - Query `AnalysisTypeRegistry` for section templates
+
+3. **Section Resolution**:
+   - Determine which sections to generate based on:
+     - Available analysis results in database
+     - Section configuration (enabled/disabled)
+     - Section mapping (which analysis types map to which sections)
+   - Load section templates from analysis plugins or configuration
+   - Filter out sections for analysis types with no results
+
+4. **Context Building**:
 
    - Combine analysis results into structured context
+   - Map analysis results to their corresponding sections
    - Add user preferences and focus areas
    - Include previous newsletter for trend context (if available)
    - Determine A/B test variant (if active)
 
-3. **Prompt Construction**:
+5. **Prompt Construction**:
 
    - Build system prompt with tone/style guidelines
-   - Create section-specific prompts
+   - Create section-specific prompts for resolved sections
    - Include examples of good newsletter content
+   - Include analysis-specific context for each section
 
-4. **Content Generation** (AI calls):
+6. **Content Generation** (AI calls, sequential):
 
-   - **Executive Summary**: Generate 2-3 sentence overview
-   - **Key Insights**: Extract top 3-5 insights with priorities
-   - **Technical Analysis Section**: Summarize technical findings
-   - **Fundamental Analysis Section**: Summarize fundamental findings
-   - **Competitive Landscape**: Summarize competitive position
-   - **Sentiment Section**: Summarize sentiment analysis
+   - **Executive Summary**: Generate 2-3 sentence overview from all analyses
+   - **Key Insights**: Extract top 3-5 insights with priorities across all analysis types
+   - **Dynamic Analysis Sections**: For each resolved analysis section:
+     - Load section template (from plugin or config)
+     - Generate content using analysis results
+     - Format according to section configuration
    - **Action Items**: Generate actionable recommendations (if enabled)
 
-5. **Personalization**:
+7. **Personalization**:
 
    - Adjust detail level based on user preferences
    - Emphasize focus areas
    - Customize tone if user has preferences
+   - Show/hide sections based on user preferences
 
-6. **Formatting**:
+8. **Formatting**:
 
    - Apply newsletter template
    - Generate email HTML version
    - Generate dashboard HTML version
    - Create chart data for visualizations
+   - Include only resolved sections in output
 
-7. **Quality Check**: Basic validation (length, structure, completeness)
-8. **Return**: Complete newsletter content
+9. **Quality Check**: 
+   - Basic validation (length, structure, completeness)
+   - Verify all required sections are present
+   - Verify analysis sections match available results
+
+10. **Return**: Complete newsletter content with dynamic sections
 
 ## Sequence Diagram
 
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] --> B[Content Generation Agent]
-    B --> C[Agent receives analysisResults & user preferences]
-    C --> D[Build context<br/>analysis + user prefs + previous newsletter]
-    D --> E{A/B test active?}
-    E -->|Yes| F[Determine A/B test variant]
-    E -->|No| G[AI Content Generation Sequential]
-    F --> G
+    A[Scheduler] --> B[Content Generation Agent<br/>Triggered independently]
+    B --> B1[Load section config<br/>from Database]
+    B1 --> B2[Query AnalysisTypeRegistry<br/>for section templates]
+    B2 --> C[Agent reads analysis results<br/>from Database]
+    C --> C2[Agent reads user preferences<br/>from Database]
+    C2 --> D[Resolve sections<br/>Check available analyses<br/>Map to section config<br/>Load templates]
+    D --> E[Build context<br/>analysis + user prefs + previous newsletter]
+    E --> F{A/B test active?}
+    F -->|Yes| G[Determine A/B test variant]
+    F -->|No| H[AI Content Generation Sequential]
+    G --> H
     
     subgraph Generation [AI Content Generation Sequential]
         direction TB
-        G1[1. Executive Summary AI call] --> G2[2. Key Insights AI call]
-        G2 --> G3[3. Technical Analysis AI call]
-        G3 --> G4[4. Fundamental Analysis AI call]
-        G4 --> G5[5. Competitive Landscape AI call]
-        G5 --> G6[6. Sentiment AI call]
-        G6 --> G7[7. Action Items AI call]
+        H1[1. Executive Summary AI call] --> H2[2. Key Insights AI call<br/>across all analyses]
+        H2 --> H3[3. Dynamic Analysis Sections<br/>For each resolved section]
+        H3 --> H4[Section 1: e.g., Sentiment<br/>Load template<br/>Generate from results]
+        H4 --> H5[Section 2: e.g., Competitive<br/>Load template<br/>Generate from results]
+        H5 --> H6[Section N: Additional analyses<br/>Dynamically generated]
+        H6 --> H7[4. Action Items AI call]
     end
     
-    G --> Generation
-    Generation --> H[Personalization<br/>adjust for user preferences]
-    H --> I[Formatting<br/>apply templates, generate HTML]
-    I --> J[Quality Check]
-    J --> K[Return newsletter content]
+    H --> Generation
+    Generation --> I[Personalization<br/>adjust for user preferences<br/>filter sections]
+    I --> J[Formatting<br/>apply templates, generate HTML<br/>include only resolved sections]
+    J --> K[Quality Check<br/>validate structure]
+    K --> L[Write newsletter to Database]
+    L --> M[Newsletter available for QA Agent]
 "
 />

@@ -8,10 +8,11 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 
 ## Inputs
 
-- `newsletter: NewsletterContent` - Output from Content Generation Agent
-- `sourceData: DataCollectionOutput` - Original collected data for fact-checking
-- `analysisResults: AnalysisOutput` - Analysis results for verification
-- `complianceRules: ComplianceConfig` - Compliance requirements
+- `ticker: string` - Company identifier
+- `userId: string` - User identifier
+- `newsletterId: string` - Newsletter identifier
+
+**Note**: The agent reads newsletter content, source data, and analysis results directly from the database. It does not receive data from the Content Generation Agent or other agents. The agent works independently and queries the database for the necessary data.
 
 ## Configurations
 
@@ -117,7 +118,8 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 ## Process
 
 1. **Initialize**: Load compliance rules, QA config
-2. **Fact-Checking**:
+2. **Read Data**: Query database for newsletter content, source data, and analysis results (independent of other agents)
+3. **Fact-Checking**:
 
    - Extract all factual claims from newsletter
    - Cross-reference with source data (news articles, market data)
@@ -160,9 +162,11 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 <Mermaid
   chart="
 flowchart TD
-    A[Content Generation] --> B[Quality Assurance Agent]
-    B --> C[Agent receives newsletter + source data]
-    C --> D[Parallel QA Checks]
+    A[Scheduler] --> B[Quality Assurance Agent<br/>Triggered independently]
+    B --> C[Agent reads newsletter from Database]
+    C --> C2[Agent reads source data from Database]
+    C2 --> C3[Agent reads analysis results from Database]
+    C3 --> D[Parallel QA Checks]
     
     D --> E1[Fact Checker<br/>Extract claims<br/>Cross-reference sources<br/>Verify numbers/dates<br/>AI: Verify complex claims]
     D --> E2[Quality Scorer<br/>Readability analysis<br/>Completeness check<br/>Consistency check<br/>Grammar check<br/>Calculate score]
@@ -173,7 +177,8 @@ flowchart TD
     E3 --> F
     
     F --> G{Decision}
-    G -->|Approved| H[Return validation results]
+    G -->|Approved| H[Write approval status to Database]
     G -->|Requires Revision| H
+    H --> I[QA complete<br/>Status available for Delivery Agent]
 "
 />

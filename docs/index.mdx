@@ -4,9 +4,9 @@ title: MediaPulse
 
 ## About
 
-MediaPulse is an intelligent, multi-agent platform designed to deliver personalized, actionable stock market insights to busy executives and investors. The system automatically collects data from multiple sources (news sites, social media, market data APIs, earnings calls), performs comprehensive analysis (technical, fundamental, competitive, and sentiment), and generates executive-friendly newsletters tailored to each user's preferences.
+MediaPulse is an intelligent, multi-agent platform designed to deliver personalized media monitoring insights to busy executives who own or manage companies. The system automatically collects data from multiple sources (news sites, social media, public media), performs comprehensive analysis (sentiment and competitive landscape), and generates executive-friendly newsletters tailored to each user's preferences.
 
-Built with modern technologies including Next.js, TypeScript, and OpenAI's GPT-4, the system employs a modular architecture where specialized AI agents work together to transform raw market data into concise, high-quality investment intelligence. The platform continuously learns and improves through user feedback, engagement metrics, and A/B testing, ensuring that the content quality and relevance improve over time.
+Built with modern technologies including Next.js, TypeScript, and OpenAI's GPT-4, the system employs a modular architecture where specialized AI agents work together to transform raw media data into concise, high-quality media intelligence. The platform continuously learns and improves through user feedback, engagement metrics, and A/B testing, ensuring that the content quality and relevance improve over time.
 
 The system is designed for scalability and reliability, with robust error handling, retry mechanisms, and comprehensive monitoring. All configurations are stored in the database and can be updated dynamically without code changes, making it easy to adapt to changing market conditions and user needs.
 
@@ -26,7 +26,7 @@ The system consists of 8 specialized agents that work together:
 
 1. **[Query Strategy Agent](./agents/agent-query-strategy)** - Entity discovery, query generation, and optimization
 2. **[Data Collection Agent](./agents/agent-data-collection)** - Multi-source data collection with intelligent filtering
-3. **[Analysis Agent](./agents/agent-analysis)** - Technical, fundamental, competitive, and sentiment analysis
+3. **[Analysis Agent](./agents/agent-analysis)** - Sentiment, competitive, and event/context analysis
 4. **[Content Generation Agent](./agents/agent-content-generation)** - Personalized newsletter creation
 5. **[Quality Assurance Agent](./agents/agent-quality-assurance)** - Content validation and compliance checking
 6. **[Delivery Agent](./agents/agent-delivery)** - Email and dashboard delivery with tracking

@@ -4,7 +4,7 @@ title: Development Plan 2026
 
 ## Overview
 
-This document outlines an incremental development plan for the AI-Powered Stock Newsletter System throughout 2026. The plan is organized to ensure that **each milestone produces a working end-to-end system**, even if some features are limited or simplified.
+This document outlines an incremental development plan for the MediaPulse Media Monitoring Platform throughout 2026. The plan is organized to ensure that **each milestone produces a working end-to-end system**, even if some features are limited or simplified.
 
 ## Development Philosophy
 
@@ -27,7 +27,7 @@ Build the simplest working version of the entire pipeline
 - **[Milestone 1: Foundation & Basic Pipeline](/plan/milestone-1-foundation)** - Database, basic scheduler, minimal agents
 - **[Milestone 2: First Working Newsletter](/plan/milestone-2-first-newsletter)** - End-to-end newsletter generation with hardcoded data
 - **[Milestone 3: Basic Data Collection](/plan/milestone-3-basic-data)** - Single source data collection
-- **[Milestone 4: Basic Analysis & Content](/plan/milestone-4-basic-analysis)** - Simple analysis and content generation
+- **[Milestone 4: Basic Analysis & Content](/plan/milestone-4-basic-analysis)** - Plugin system infrastructure and initial analysis plugins
 
 ### Phase 2: Core Features (Milestones 5-8)
 
@@ -35,7 +35,7 @@ Enhance each component with core functionality
 
 - **[Milestone 5: Query Strategy (Basic)](/plan/milestone-5-query-strategy)** - Entity discovery and query generation
 - **[Milestone 6: Enhanced Data Collection](/plan/milestone-6-enhanced-data)** - Multiple sources, deduplication, and agent versioning
-- **[Milestone 7: Enhanced Analysis](/plan/milestone-7-enhanced-analysis)** - Multiple analysis types
+- **[Milestone 7: Enhanced Analysis](/plan/milestone-7-enhanced-analysis)** - Additional analysis plugins and enhancements (demonstrates plugin system flexibility)
 - **[Milestone 8: Quality Assurance (Basic)](/plan/milestone-8-quality-assurance)** - Basic validation and compliance
 
 ### Phase 3: Advanced Features (Milestones 9-12)
@@ -43,7 +43,7 @@ Enhance each component with core functionality
 Add advanced capabilities and optimizations
 
 - **[Milestone 9: Enhanced Content Generation](/plan/milestone-9-enhanced-content)** - Personalization and A/B testing
-- **[Milestone 10: Advanced Data Collection](/plan/milestone-10-advanced-data)** - Earnings, SEC filings, advanced processing
+- **[Milestone 10: Advanced Data Collection](/plan/milestone-10-advanced-data)** - Earnings analysis plugin, SEC filings, advanced processing
 - **[Milestone 11: Enhanced Quality Assurance](/plan/milestone-11-enhanced-qa)** - Fact-checking and advanced validation
 - **[Milestone 12: Learning Agent (Basic)](/plan/milestone-12-learning)** - Metrics collection and basic optimization
 
@@ -70,18 +70,46 @@ Each milestone builds upon the previous ones while maintaining a working system:
 flowchart TD
     M1[Milestone 1: Foundation] --> M2[Milestone 2: First Newsletter<br/>works with hardcoded data]
     M2 --> M3[Milestone 3: Basic Data Collection<br/>replaces hardcoded data]
-    M3 --> M4[Milestone 4: Basic Analysis<br/>adds simple insights]
+    M3 --> M4[Milestone 4: Plugin System<br/>+ initial analysis plugins]
     M4 --> M5[Milestone 5: Query Strategy<br/>improves data quality]
     M5 --> M6[Milestone 6: Enhanced Data<br/>more sources]
-    M6 --> M7[Milestone 7: Enhanced Analysis<br/>deeper insights]
+    M6 --> M7[Milestone 7: More Plugins<br/>+ enhanced existing plugins]
     M7 --> M8[Milestone 8: Quality Assurance<br/>validates content]
     M8 --> M9[Milestone 9: Enhanced Content<br/>personalization]
-    M9 --> M10[Milestone 10: Advanced Data<br/>earnings, filings]
+    M9 --> M10[Milestone 10: Earnings Plugin<br/>+ advanced data sources]
     M10 --> M11[Milestone 11: Enhanced QA<br/>fact-checking]
     M11 --> M12[Milestone 12: Learning<br/>optimization]
     M12 --> M13[Milestone 13: Production<br/>hardening]
     M13 --> M14[Milestone 14: Advanced Learning<br/>self-improvement]
 "
+/>
+
+## Overall Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Development Plan 2026 - Overall Timeline
+    dateFormat  YYYY-MM-DD
+    section Phase 1: Minimal Viable System
+    Milestone 1: Foundation & Basic Pipeline        :m1, 2026-01-01, 28d
+    Milestone 2: First Working Newsletter          :m2, 2026-01-29, 14d
+    Milestone 3: Basic Data Collection             :m3, 2026-02-12, 14d
+    Milestone 4: Basic Analysis & Content          :m4, 2026-02-26, 14d
+    section Phase 2: Core Features
+    Milestone 5: Query Strategy (Basic)           :m5, 2026-03-12, 14d
+    Milestone 6: Enhanced Data Collection         :m6, 2026-03-26, 14d
+    Milestone 7: Enhanced Analysis                :m7, 2026-04-09, 14d
+    Milestone 8: Quality Assurance (Basic)         :m8, 2026-04-23, 14d
+    section Phase 3: Advanced Features
+    Milestone 9: Enhanced Content Generation      :m9, 2026-05-07, 14d
+    Milestone 10: Advanced Data Collection        :m10, 2026-05-21, 14d
+    Milestone 11: Enhanced Quality Assurance      :m11, 2026-06-04, 14d
+    Milestone 12: Learning Agent (Basic)          :m12, 2026-06-18, 14d
+    section Phase 4: Production Ready
+    Milestone 13: Production Hardening            :m13, 2026-07-02, 14d
+    Milestone 14: Advanced Learning               :m14, 2026-07-16, 14d
+  "
 />
 
 ## Key Principles

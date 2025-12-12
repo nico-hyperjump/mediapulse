@@ -111,24 +111,28 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
 3. **Pipeline Execution** (for each job):
 
    - **Stage 1: Data Collection**
-     - Trigger Data Collection Agent
+     - Trigger Data Collection Agent (independent execution)
+     - Agent reads queries from database, collects data, writes to database
      - Wait for completion (with timeout)
      - Handle errors/retries
    - **Stage 2: Analysis**
-     - Pass collected data to Analysis Agent
+     - Trigger Analysis Agent (independent execution)
+     - Agent reads collected data from database, performs analysis, writes results to database
      - Wait for completion
      - Handle errors/retries
    - **Stage 3: Content Generation**
-     - Pass analysis results to Content Generation Agent
-     - Include user preferences
+     - Trigger Content Generation Agent (independent execution)
+     - Agent reads analysis results and user preferences from database, generates newsletter, writes to database
      - Wait for completion
      - Handle errors/retries
    - **Stage 4: Quality Assurance**
-     - Pass newsletter to QA Agent
+     - Trigger QA Agent (independent execution)
+     - Agent reads newsletter from database, validates, writes approval status to database
      - If not approved, either retry content generation or flag
      - Wait for approval
    - **Stage 5: Delivery**
-     - Pass approved newsletter to Delivery Agent
+     - Trigger Delivery Agent (independent execution)
+     - Agent reads approved newsletter from database, sends email, writes metrics to database
      - Wait for completion
      - Handle errors/retries
 
@@ -165,17 +169,18 @@ flowchart TD
     
     subgraph Pipeline [Pipeline Execution per job]
         direction TB
-        S1[Stage 1: Data Collection<br/>Trigger Data Collection Agent<br/>Wait & Handle errors/retries] --> S2[Stage 2: Analysis<br/>Trigger Analysis Agent<br/>Pass collected data<br/>Wait & Handle errors/retries]
-        S2 --> S3[Stage 3: Content Generation<br/>Trigger Content Gen Agent<br/>Pass analysis + user prefs<br/>Wait & Handle errors/retries]
-        S3 --> S4[Stage 4: Quality Assurance<br/>Trigger QA Agent]
+        S1[Stage 1: Data Collection<br/>Trigger Data Collection Agent<br/>Agent reads queries from DB<br/>Agent writes data to DB<br/>Wait & Handle errors/retries] --> S2[Stage 2: Analysis<br/>Trigger Analysis Agent<br/>Agent reads data from DB<br/>Agent writes analysis to DB<br/>Wait & Handle errors/retries]
+        S2 --> S3[Stage 3: Content Generation<br/>Trigger Content Gen Agent<br/>Agent reads analysis from DB<br/>Agent writes newsletter to DB<br/>Wait & Handle errors/retries]
+        S3 --> S4[Stage 4: Quality Assurance<br/>Trigger QA Agent<br/>Agent reads newsletter from DB<br/>Agent writes approval to DB]
         S4 --> S4B{Approved?}
         S4B -->|No| S4C[Retry/fail]
-        S4B -->|Yes| S5[Stage 5: Delivery<br/>Trigger Delivery Agent<br/>Wait & Handle errors/retries]
+        S4B -->|Yes| S5[Stage 5: Delivery<br/>Trigger Delivery Agent<br/>Agent reads newsletter from DB<br/>Agent writes metrics to DB<br/>Wait & Handle errors/retries]
         S4C --> S5
     end
     
     E --> Pipeline
-    Pipeline --> F[Collect metrics & send to Learning Agent]
-    F --> G[Return pipeline results]
+    Pipeline --> F[Collect metrics & write to Database]
+    F --> G[Learning Agent reads metrics from DB independently]
+    G --> H[Return pipeline results]
 "
 />

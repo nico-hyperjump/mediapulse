@@ -8,10 +8,9 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
 
 ## Inputs
 
-- `metrics: Array<MetricEvent>` - Engagement metrics (opens, clicks, time spent)
-- `feedback: Array<UserFeedback>` - Explicit user feedback (ratings, comments)
-- `newsletterPerformance: Array<NewsletterMetrics>` - Newsletter performance data
-- `agentPerformance: Array<AgentMetrics>` - Performance of other agents
+- None (agent reads all data from database independently)
+
+**Note**: The agent reads metrics, feedback, and performance data directly from the database. It does not receive data from other agents. The agent works independently and queries the database for all necessary information.
 
 ## Configurations
 
@@ -190,9 +189,12 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
 
    - Apply approved optimizations to draft versions
    - Update A/B test traffic splits
+   - Write updated configurations to database
    - Note: Production deployments require admin approval via admin dashboard
 
-10. **Return**: Analysis results, recommendations, and newly created versions
+10. **Storage**: Write all analysis results, recommendations, and new configurations to database
+
+11. **Note**: Other agents read updated configurations from the database independently on their next execution. The Learning Agent does not directly communicate with other agents.
 
 ## Sequence Diagram
 
@@ -216,7 +218,8 @@ flowchart TD
     F --> G[Create new agent versions<br/>with optimized configs<br/>Status: 'draft']
     G --> H{auto-update enabled?}
     H -->|Yes| I[Apply optimizations to draft versions]
-    H -->|No| J[Return analysis, recommendations & new versions]
+    H -->|No| J[Write to Database<br/>configs, versions, recommendations]
     I --> J
+    J --> K[Learning Agent complete<br/>Other agents read configs<br/>from DB independently]
 "
 />

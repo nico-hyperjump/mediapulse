@@ -20,54 +20,79 @@ Implement real data collection from one reliable source (NewsAPI) to replace har
 
 - ✅ **Independent Scheduling**:
   - Runs on its own schedule (every 2-4 hours by default, configurable per ticker)
-  - Operates independently - doesn't wait for other agents
-  - Reads latest queries from database (when available)
+  - Operates independently - doesn't wait for other agents or scheduler
+  - Can also be triggered by Scheduler Agent if data is stale during newsletter generation
+  - Uses hardcoded query mapping (ticker → company name) stored in code for this milestone
 - ✅ **NewsAPI integration**:
-  - API client setup
-  - Basic query construction (ticker name search)
-  - Article fetching and parsing
-  - Rate limiting handling
-- ✅ **Basic market data**:
-  - Alpha Vantage API integration (or Yahoo Finance)
-  - Price, change, volume data
-  - Simple error handling
+  - API client setup with authentication
+  - Query string construction from ticker (e.g., "AAPL" → "Apple Inc" → NewsAPI search query)
+  - Article fetching and parsing (title, URL, description, published date)
+  - Rate limiting handling (respects NewsAPI rate limits)
 - ✅ Data storage to `DataSource` table:
-  - News articles with metadata
-  - Market data with timestamps
+  - News articles with metadata (title, url, snippet/description, publishedAt, collectedAt)
   - Timestamps for freshness tracking
+  - Links to `tickerId` for association
 - ✅ Basic deduplication:
-  - URL-based deduplication
-  - Title similarity (simple string matching)
+  - URL-based deduplication (exact match)
+  - Title similarity (simple string matching, case-insensitive)
 - ✅ Error handling:
   - API failure handling
   - Retry logic with exponential backoff
-  - Graceful degradation (return partial data if some sources fail)
+  - Graceful degradation (continues with partial data if API fails partially)
 
 ### Query Strategy (Minimal - Hardcoded)
 
-- ✅ Simple query generation:
-  - Ticker name → search query (e.g., "AAPL" → "Apple Inc")
+- ✅ Simple query mapping (hardcoded in code):
+  - Ticker symbol → company name mapping (e.g., "AAPL" → "Apple Inc")
+  - Company name → NewsAPI search query (e.g., "Apple Inc" → "Apple Inc OR Apple")
+  - Mapping stored in code/configuration (not in database yet)
   - No entity discovery yet
   - No query optimization yet
-- ✅ Hardcoded query templates
+  - No database storage of queries yet (will be added in later milestones)
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 3 - Basic Data Collection
+    dateFormat  YYYY-MM-DD
+    section Data Collection Agent
+    Independent scheduling implementation     :a1, 2026-02-12, 2d
+    NewsAPI client setup                     :a2, 2026-02-12, 2d
+    Ticker to query string mapping           :a3, after a2, 1d
+    Article fetching & parsing               :a4, after a3, 2d
+    Rate limiting handling                   :a5, after a4, 1d
+    DataSource table integration             :a6, after a4, 1d
+    URL-based deduplication                  :a7, after a6, 1d
+    Title similarity matching                :a8, after a7, 1d
+    Error handling & retries                 :a9, after a5, 2d
+    section Query Strategy
+    Hardcoded ticker-to-company mapping      :b1, 2026-02-12, 1d
+    Query string template creation           :b2, after b1, 1d
+  "
+/>
 
 ## Limitations (Acceptable for This Milestone)
 
 - Only one news source (NewsAPI)
 - No social media data
 - No earnings or SEC filings
-- Simple query generation (ticker name only)
-- Basic deduplication only
-- No relevance scoring
+- Simple query generation (ticker → company name mapping only, hardcoded in code)
+- Queries not stored in database (hardcoded in code/configuration)
+- Basic deduplication only (URL exact match and simple title similarity)
+- No relevance scoring (all collected articles stored regardless of relevance)
+- No entity discovery or relationship expansion (searches only for company name)
 
 ## Success Criteria
 
-- ✅ Collects 10+ real news articles per ticker per day
-- ✅ Fetches accurate market data
-- ✅ Data is stored correctly in database
-- ✅ Deduplication removes obvious duplicates
-- ✅ Newsletter content uses real collected data
-- ✅ System handles API failures gracefully
+- ✅ Collects 10+ real news articles per company per day (cumulative across all collection runs)
+- ✅ Data is stored correctly in `DataSource` table with proper ticker associations
+- ✅ Deduplication removes obvious duplicates (same URL or very similar titles)
+- ✅ Newsletter content uses real collected data (not mock data)
+- ✅ System handles API failures gracefully (retries, continues with partial data)
+- ✅ Independent scheduling works (agent runs every 2-4 hours without scheduler trigger)
+- ✅ Scheduler can trigger immediate data collection if data is stale during newsletter generation
 
 ## Next Steps
 

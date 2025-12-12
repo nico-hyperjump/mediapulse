@@ -71,11 +71,52 @@ Expand data collection to multiple sources and improve data quality through bett
   - Deployment controls
   - Simple validation dashboard
 
+**Note**: The Agent Versioning System is a foundational infrastructure feature that enables safe iteration on agent improvements. While it's introduced in this milestone, it will be fully utilized in later milestones (particularly Milestone 14) when the Learning Agent creates optimized versions automatically.
+
 ### Database Updates
 
 - ✅ Agent version tables (`AgentVersion`, `AgentVersionDeployment`)
 - ✅ Basic experimentation tables (`AgentExperiment`, `AgentValidation`)
 - ✅ Version tracking in agent configs
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 6 - Enhanced Data Collection
+    dateFormat  YYYY-MM-DD
+    section Data Collection Agent
+    Priority-based scheduling                :a1, 2026-03-26, 1d
+    Google News API integration              :a2, 2026-03-26, 2d
+    RSS feed parsing                         :a3, after a2, 2d
+    Twitter/X API integration                :a4, after a2, 3d
+    AI-powered deduplication                 :a5, after a3, 2d
+    Fuzzy title matching                     :a6, after a5, 1d
+    URL normalization                        :a7, after a6, 1d
+    AI relevance scoring                     :a8, after a7, 2d
+    Content filtering                        :a9, after a8, 1d
+    Source health monitoring                 :a10, after a4, 2d
+    Source-specific rate limiting            :a11, after a10, 1d
+    section Query Strategy
+    Query performance tracking               :b1, 2026-03-26, 1d
+    Query prioritization                     :b2, after b1, 1d
+    section Agent Versioning
+    Version tables schema                    :c1, 2026-03-26, 1d
+    Version creation system                  :c2, after c1, 2d
+    Version status tracking                  :c3, after c2, 1d
+    Experimentation system                   :c4, after c3, 2d
+    Version comparison                       :c5, after c4, 1d
+    Deployment system                        :c6, after c5, 2d
+    Rollback capability                      :c7, after c6, 1d
+    Hot-reload configuration                 :c8, after c7, 1d
+    section Admin Dashboard
+    Version management UI                    :d1, after c3, 2d
+    Version comparison tools                 :d2, after d1, 1d
+    Deployment controls                      :d3, after d2, 1d
+    Validation dashboard                    :d4, after d3, 1d
+  "
+/>
 
 ## Limitations (Acceptable for This Milestone)
 
@@ -100,4 +141,4 @@ Expand data collection to multiple sources and improve data quality through bett
 
 ## Next Steps
 
-After this milestone, data collection is robust with multiple sources and agent versioning enables safe iteration on improvements. Milestone 7 will add comprehensive analysis (fundamental, competitive, advanced technical).
+After this milestone, data collection is robust with multiple sources and agent versioning enables safe iteration on improvements. Milestone 7 will add comprehensive analysis (competitive, sentiment, and event/context analysis).

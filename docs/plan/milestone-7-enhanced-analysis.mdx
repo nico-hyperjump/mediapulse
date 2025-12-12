@@ -4,7 +4,7 @@ title: Milestone 7 - Enhanced Analysis
 
 ## Summary
 
-Add comprehensive analysis capabilities: fundamental, competitive, and advanced technical analysis.
+Add comprehensive analysis capabilities: competitive, sentiment, and event/context analysis.
 
 ## Timeline
 
@@ -12,62 +12,97 @@ Weeks 15-16
 
 ## Goal
 
-Implement full analysis suite to provide deep insights beyond basic sentiment and technical indicators.
+Add comprehensive analysis capabilities by implementing additional analysis plugins and enhancing existing ones. Demonstrate the flexibility of the plugin system by adding new analysis types without core code changes.
 
 ## Deliverables
 
-### Analysis Agent (Comprehensive)
+### Analysis Agent (Plugin Enhancements)
 
-- ✅ **Fundamental Analysis**:
-  - Financial metrics extraction (P/E, P/B, ROE, Debt/Equity)
-  - Revenue growth analysis
-  - Basic peer comparison
-  - Valuation assessment (simple)
-- ✅ **Competitive Analysis**:
+- ✅ **New Analysis Plugin - Competitive Analysis**:
   - Peer group identification (from Query Strategy entities)
-  - Metric comparison (market cap, revenue, growth)
-  - Industry trend analysis (basic)
-- ✅ **Advanced Technical Analysis**:
-  - Multiple technical indicators (RSI, MACD, SMA, EMA)
-  - Support and resistance levels
-  - Trend analysis
-  - Multi-timeframe analysis (if data available)
-- ✅ **Enhanced Sentiment Analysis**:
+  - Media coverage comparison across competitors
+  - Industry trend analysis in media coverage
+  - Competitive positioning assessment
+  - Registered as new plugin in `AnalysisTypeRegistry`
+- ✅ **Enhanced Sentiment Analysis Plugin**:
   - Weighted sentiment calculation
   - Time decay for older news
   - Sentiment trend detection
-- ✅ **Insight Extraction**:
-  - Cross-analysis insight identification
+  - Source credibility weighting
+  - Plugin version updated with enhanced capabilities
+- ✅ **Enhanced Event/Context Analysis Plugin**:
+  - External event identification (natural disasters, political changes, regulatory updates, economic shifts, social movements)
+  - Relevance scoring for events
+  - Impact assessment (operations, reputation, strategy)
+  - Early warning signal detection
+  - Opportunity identification
+  - Plugin version updated with enhanced capabilities
+- ✅ **Cross-Plugin Insight Extraction**:
+  - Cross-analysis insight identification across all registered plugins
   - Priority scoring for insights
   - AI-powered insight generation
+  - Plugin-aware insight aggregation
 
 ### Content Generation Agent (Enhanced)
 
-- ✅ Include all analysis types in newsletter:
-  - Fundamental analysis section
-  - Competitive landscape section
-  - Advanced technical analysis section
-  - Enhanced sentiment section
-- ✅ Better insight presentation
-- ✅ Improved formatting and structure
+- ✅ Dynamic section generation for all registered plugins:
+  - Automatic section creation for competitive analysis plugin
+  - Enhanced sections for updated sentiment and event plugins
+  - Section templates for each analysis type
+  - Conditional rendering based on available analysis results
+- ✅ Better insight presentation:
+  - Cross-plugin insight aggregation
+  - Priority-based insight ordering
+  - Plugin-specific visualization support
+- ✅ Improved formatting and structure:
+  - Enhanced section templates
+  - Better integration of multiple analysis types
+  - Responsive layout for dynamic sections
+
+## Task Timeline
+
+<Mermaid
+  chart="
+gantt
+    title Milestone 7 - Enhanced Analysis
+    dateFormat  YYYY-MM-DD
+    section Analysis Agent
+    Competitive analysis plugin             :a1, 2026-04-09, 3d
+    Plugin registration                     :a2, after a1, 1d
+    Sentiment plugin enhancement            :a3, 2026-04-09, 2d
+    Sentiment plugin version update         :a4, after a3, 1d
+    Event plugin enhancement                :a5, 2026-04-09, 2d
+    Event plugin version update             :a6, after a5, 1d
+    Cross-plugin insight extraction         :a7, after a2, 2d
+    Priority scoring                        :a8, after a7, 1d
+    AI insight generation                   :a9, after a8, 1d
+    section Content Generation
+    Competitive section mapping             :b1, after a2, 1d
+    Enhanced section templates              :b2, after a4, 1d
+    Dynamic section rendering                :b3, after b1, 1d
+    Insight presentation improvements       :b4, after a9, 1d
+    Formatting enhancements                 :b5, after b4, 1d
+  "
+/>
 
 ## Limitations (Acceptable for This Milestone)
 
-- Basic fundamental metrics (no deep financial analysis)
 - Simple peer comparison (no complex industry analysis)
-- Limited historical data for technical analysis
-- No earnings analysis yet
+- Basic event identification (no deep impact modeling)
+- Event relevance scoring may need refinement
+- Plugin system supports basic plugin interface (advanced plugin features in later milestones)
 
 ## Success Criteria
 
-- ✅ All analysis types are calculated and stored
-- ✅ Fundamental metrics are accurate
+- ✅ Competitive analysis plugin is registered and functional
+- ✅ All analysis plugins (sentiment, competitive, event) are calculated and stored
+- ✅ Plugin system demonstrates flexibility (new plugin added without core code changes)
 - ✅ Peer comparisons are relevant
-- ✅ Technical indicators are calculated correctly
-- ✅ Newsletters include comprehensive analysis
+- ✅ Events are identified accurately with appropriate relevance scores
+- ✅ Newsletters dynamically include sections for all registered analysis plugins
 - ✅ Insights are actionable and relevant
+- ✅ Content generation adapts automatically to available analysis plugins
 
 ## Next Steps
 
-After this milestone, analysis is comprehensive. Milestone 8 will add quality assurance to validate content before delivery.
-
+After this milestone, analysis is comprehensive with three registered plugins. The plugin system infrastructure is proven and ready for additional analysis types. Milestone 8 will add quality assurance to validate content before delivery. Milestone 10 will add an Earnings Analysis plugin, further expanding the analysis capabilities.
