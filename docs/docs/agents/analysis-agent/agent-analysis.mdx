@@ -10,11 +10,11 @@ Analyze collected media data to generate insights using a plugin-based architect
 
 The Analysis Agent uses a **plugin-based system** where analysis types are registered in the database and loaded dynamically. By default, the system includes three built-in analysis types:
 
-1. **Sentiment Analysis** (`sentiment`): Measures public perception and emotional tone of media coverage about the company. Analyzes how positively or negatively the company is being discussed across news and social media, tracks sentiment trends over time, and identifies key drivers of sentiment changes.
+1. **Event/Context Analysis** (`event`): Identifies and analyzes external events that could affect the company, such as natural disasters, political discourse, regulatory changes, economic shifts, social movements, and industry disruptions. Assesses the potential impact of these events on the company's operations, reputation, and strategic positioning.
 
 2. **Competitive Analysis** (`competitive`): Monitors media coverage of competitors and compares it to the company's coverage. Identifies industry trends, tracks competitive positioning in the media, and provides insights into how competitors are being perceived relative to the company.
 
-3. **Event/Context Analysis** (`event`): Identifies and analyzes external events that could affect the company, such as natural disasters, political discourse, regulatory changes, economic shifts, social movements, and industry disruptions. Assesses the potential impact of these events on the company's operations, reputation, and strategic positioning.
+3. **Sentiment Analysis** (`sentiment`): Measures public perception and emotional tone of media coverage about the company. Analyzes how positively or negatively the company is being discussed across news and social media, tracks sentiment trends over time, and identifies key drivers of sentiment changes.
 
 **New analysis types can be added** by registering them in the `AnalysisTypeRegistry` table. See [Extending Analysis Types](/agents/extending-analysis-types) for details.
 
