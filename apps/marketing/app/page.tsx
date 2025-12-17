@@ -285,7 +285,7 @@ export default function Home() {
                 </div>
                 <CardTitle className="text-xl mb-2">Quality Assurance</CardTitle>
                 <CardDescription className="text-sm leading-relaxed flex-1">
-                  Every newsletter is fact-checked and reviewed for accuracy
+                  Every newsletter is checked and reviewed by our AI agents for accuracy
                   before it reaches your inbox.
                 </CardDescription>
               </CardHeader>
@@ -560,7 +560,7 @@ export default function Home() {
                 <div className="flex-1 flex flex-col">
                   <h3 className="text-xl font-semibold mb-2 group-hover:text-primary transition-colors">Quality Assured</h3>
                   <p className="text-muted-foreground text-sm leading-relaxed flex-1">
-                    Every newsletter is fact-checked to ensure you get accurate
+                    Every newsletter is checked by our AI agents to ensure you get accurate
                     and reliable information.
                   </p>
                 </div>
