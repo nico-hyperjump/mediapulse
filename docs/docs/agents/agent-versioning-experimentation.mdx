@@ -28,9 +28,9 @@ The agent versioning and experimentation system allows admins to:
   id: string
   agentId: string                    // Agent identifier (scheduler, query-strategy, etc.)
   version: string                     // Semantic version (e.g., "1.2.3")
-  config: object                      // Agent configuration snapshot (JSONB)
-  prompts?: object                    // Prompt templates snapshot (JSONB)
-  codeHash: string                    // Hash of agent implementation code
+  config: object                      // Agent configuration snapshot (JSONB) - from AgentConfig
+  prompts?: object                    // Prompt templates snapshot (JSONB) - from AgentPromptVersion
+  codeHash: string                    // Hash of agent implementation code (for tracking code changes)
   createdAt: Date
   createdBy: string                   // 'learning-agent' | 'admin' | 'manual'
   metadata: {
@@ -42,6 +42,8 @@ The agent versioning and experimentation system allows admins to:
   status: 'draft' | 'experimental' | 'testing' | 'production' | 'deprecated'
 }
 ```
+
+**Note**: `AgentVersion` stores snapshots of configurations and prompts, but does not replace `AgentConfig`. When a version is deployed, the agent reads from `AgentConfig` (which may be updated to match the version's config). The version serves as a historical record and rollback point.
 
 **`AgentVersionDeployment`** - Tracks which version is active in each environment:
 
@@ -186,15 +188,19 @@ draft → experimental → testing → production
 ### 4. Production Deployment
 
 - Only versions that pass validation can be deployed to production
-- Deployment updates `AgentVersionDeployment` table
+- Deployment updates `AgentVersionDeployment` table to mark the active version
+- The agent's `AgentConfig` is updated to match the version's configuration (or agents read version config directly)
 - Previous production version automatically tracked for rollback
-- Agent instances hot-reload with new configuration (no downtime)
+- Agent instances reload configuration from database (hot-reload without restart, but may require agent re-initialization)
+- **Note**: Code changes (if any) still require code deployment, but config/prompt changes can be hot-reloaded
 
 ### 5. Version Rollback
 
 - Instant rollback to previous production version
-- Updates `AgentVersionDeployment` table only
-- No code deployment required
+- Updates `AgentVersionDeployment` table to point to previous version
+- Agent's `AgentConfig` is updated to match the previous version's configuration
+- Agents reload configuration from database (hot-reload)
+- No code deployment required (unless code was also changed)
 - Full audit trail maintained
 
 ## Experimentation Workflow

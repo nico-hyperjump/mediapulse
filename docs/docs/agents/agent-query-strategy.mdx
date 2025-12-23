@@ -377,14 +377,14 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 
 ## Scheduling
 
-The Query Strategy Agent runs **independently** on its own schedule:
+The Query Strategy Agent runs **independently** on its own schedule (managed by Scheduler Agent or cron):
 
 - **Entity Graph Refresh**: Weekly (configurable per ticker) - Discovers and updates entity relationships
 - **Query Optimization**: Daily - Analyzes previous day's query performance and optimizes strategies
 - **Query Generation**: On-demand or when entity graph updates - Generates new search queries
 - **Manual Trigger**: Can be triggered manually via API or admin interface
 
-The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents.
+The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents. The agent runs as a BullMQ worker, picking up jobs from the queue when scheduled or manually triggered.
 
 ## Process (Step-by-Step)
 

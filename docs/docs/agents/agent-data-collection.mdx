@@ -388,9 +388,9 @@ flowchart TD
     B --> B1[1. Load config from DB]
     B1 --> B2[2. Validate inputs]
     B2 --> B3[3. Initialize rate limiters]
-    B3 --> C[Parallel Collection 4 Workers]
+    B3 --> C[Parallel Collection]
     
-    subgraph Collection [Parallel Collection 3 Workers]
+    subgraph Collection [Parallel Collection - All Sources Concurrent]
         direction TB
         C1[News Scraper<br/>Bloomberg<br/>Reuters<br/>WSJ<br/>CNBC] --> C2[Social Monitor<br/>Twitter API<br/>Reddit API]
         C2 --> C3[Earnings Fetch<br/>SEC EDGAR<br/>Transcripts]
