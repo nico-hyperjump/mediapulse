@@ -4,7 +4,7 @@ title: Scheduler Agent
 
 ## Purpose
 
-Orchestrate the entire newsletter generation pipeline, schedule jobs, and coordinate agent execution.
+Orchestrate the newsletter generation pipeline by enqueuing jobs for independent agent execution. The scheduler checks data freshness, creates jobs for each stage of the pipeline, and enqueues them to the job queue. Agents execute independently, reading from and writing to the database. The scheduler does not wait for agent completion but tracks pipeline status through the database.
 
 ## Inputs
 
@@ -26,16 +26,18 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
   },
   pipeline: {
     agents: [
-      'data-collection',
       'analysis',
       'content-generation',
       'quality-assurance',
       'delivery'
     ],
+    dataFreshness: {
+      thresholdHours: 4, // Trigger data collection if data is older than this
+      triggerCollectionOnStale: true // Whether to trigger collection if data is stale
+    },
     parallelism: {
-      dataCollection: true, // Can run for multiple tickers in parallel
-      analysis: true,
-      contentGeneration: false, // Sequential per user
+      analysis: true, // Can run for multiple tickers in parallel
+      contentGeneration: false, // Sequential per user (personalization)
       qualityAssurance: false,
       delivery: true
     },
@@ -45,7 +47,6 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
       delay: 5000
     },
     timeout: {
-      dataCollection: 300000, // 5 min
       analysis: 180000, // 3 min
       contentGeneration: 240000, // 4 min
       qualityAssurance: 120000, // 2 min
@@ -69,93 +70,115 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
 ```typescript
 {
   agentId: 'scheduler',
-  jobId: string,
+  executionId: string,
   timestamp: Date,
   executionTime: number,
-  pipeline: {
-    status: 'completed' | 'failed' | 'partial',
-    stages: Array<{
-      stage: string,
+  orchestration: {
+    status: 'initiated' | 'in-progress' | 'completed' | 'partial',
+    jobsCreated: number,
+    jobsEnqueued: Array<{
+      jobId: string,
       agent: string,
+      stage: string,
       status: 'pending' | 'running' | 'completed' | 'failed',
-      startTime: Date,
-      endTime?: Date,
-      executionTime?: number,
-      error?: string,
-      output?: object
+      priority: number,
+      enqueuedAt: Date,
+      dependencies?: string[] // Job IDs this job depends on
     }>
   },
-  results: {
-    newslettersGenerated: number,
-    newslettersDelivered: number,
-    failures: number,
-    errors: Array<{ stage: string, error: string }>
+  dataFreshness: {
+    tickersChecked: number,
+    freshDataCount: number,
+    staleDataCount: number,
+    dataCollectionJobsTriggered: number
   },
   metadata: {
     tickersProcessed: number,
     usersProcessed: number,
-    totalExecutionTime: number
+    totalJobsCreated: number
   }
 }
 ```
 
+**Note**: The scheduler returns orchestration results immediately after enqueuing jobs. Actual pipeline status is tracked in the database and can be queried separately. Agents update their job status in the database as they execute independently.
+
 ## Process
 
 1. **Initialize**: Load schedule config, connect to job queue
-2. **Job Creation**:
 
-   - For each user-ticker combination, create pipeline job
+2. **Data Freshness Check** (for each user-ticker subscription):
+
+   - Check timestamp of latest collected data in database
+   - If data is stale (> 4 hours old), trigger Data Collection Agent immediately by enqueuing a job
+   - Note: Data Collection Agent also runs independently every 1-4 hours, so this is only needed if data is stale when newsletter generation is triggered
+
+3. **Job Creation** (for each user-ticker subscription):
+
+   - Create independent jobs for each agent in the pipeline
    - Set job priority based on user tier/preferences
-   - Schedule execution time
+   - Jobs are enqueued to the job queue (BullMQ)
+   - Agents pick up jobs independently from the queue
+   - Jobs include dependencies (e.g., Analysis job depends on data being fresh)
 
-3. **Pipeline Execution** (for each job):
+4. **Pipeline Orchestration** (agents execute independently):
 
-   - **Stage 1: Data Collection**
-     - Trigger Data Collection Agent (independent execution)
-     - Agent reads queries from database, collects data, writes to database
-     - Wait for completion (with timeout)
-     - Handle errors/retries
-   - **Stage 2: Analysis**
-     - Trigger Analysis Agent (independent execution)
-     - Agent reads collected data from database, performs analysis, writes results to database
-     - Wait for completion
-     - Handle errors/retries
-   - **Stage 3: Content Generation**
-     - Trigger Content Generation Agent (independent execution)
-     - Agent reads analysis results and user preferences from database, generates newsletter, writes to database
-     - Wait for completion
-     - Handle errors/retries
-   - **Stage 4: Quality Assurance**
-     - Trigger QA Agent (independent execution)
-     - Agent reads newsletter from database, validates, writes approval status to database
-     - If not approved, either retry content generation or flag
-     - Wait for approval
-   - **Stage 5: Delivery**
-     - Trigger Delivery Agent (independent execution)
-     - Agent reads approved newsletter from database, sends email, writes metrics to database
-     - Wait for completion
-     - Handle errors/retries
+   - **Analysis Agent Job**: Enqueued with ticker and analysis types
+     - Agent picks up job from queue independently
+     - Agent reads collected data from database
+     - Agent performs analysis and writes results to database
+     - Agent completes job and marks status in database
+   - **Content Generation Agent Job**: Enqueued after Analysis (or with dependency)
+     - Agent picks up job from queue independently
+     - Agent reads analysis results and user preferences from database
+     - Agent generates newsletter and writes to database
+     - Agent completes job and marks status in database
+   - **Quality Assurance Agent Job**: Enqueued after Content Generation
+     - Agent picks up job from queue independently
+     - Agent reads newsletter from database
+     - Agent validates content and writes approval status to database
+     - If not approved, enqueue Content Generation retry job
+   - **Delivery Agent Job**: Enqueued after QA approval
+     - Agent picks up job from queue independently
+     - Agent reads approved newsletter from database
+     - Agent sends email and writes metrics to database
+     - Agent completes job and marks status in database
 
-4. **Parallelization**:
+5. **Independent Agent Execution**:
 
-   - Run data collection for multiple tickers in parallel
-   - Run analysis in parallel
-   - Run content generation sequentially per user (personalization)
-   - Run delivery in parallel
+   - Agents do not receive data from other agents
+   - Agents read from and write to database independently
+   - Agents execute on their own schedule when jobs are available
+   - No direct agent-to-agent communication
+   - All coordination through database state
 
-5. **Error Handling**:
+6. **Job Dependencies & Status Tracking**:
 
-   - Retry failed stages with exponential backoff
-   - Log errors for monitoring
+   - Track job status in database (pending, running, completed, failed)
+   - Use job dependencies to ensure proper sequencing
+   - Monitor pipeline progress by querying database for job statuses
+   - Handle failed jobs with retry logic (exponential backoff)
+
+7. **Parallelization**:
+
+   - Multiple user-ticker jobs can run in parallel
+   - Analysis jobs for different tickers run in parallel
+   - Content generation runs sequentially per user (personalization)
+   - Delivery jobs run in parallel
+
+8. **Error Handling**:
+
+   - Failed jobs are retried with exponential backoff
+   - Log errors to database for monitoring
    - Notify on critical failures
+   - Dead-letter queue for jobs that exceed max retries
 
-6. **Metrics Collection**:
+9. **Metrics Collection**:
 
-   - Track execution times for each stage
-   - Record success/failure rates
-   - Send metrics to Learning Agent
+   - Agents write metrics to database upon completion
+   - Scheduler queries database for pipeline status
+   - Learning Agent reads metrics from database independently (runs daily at midnight)
 
-7. **Return**: Pipeline execution results
+10. **Return**: Pipeline orchestration results (job IDs, status, metadata)
 
 ## Sequence Diagram
 
@@ -164,23 +187,54 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
 flowchart TD
     A[Cron Trigger / Manual] --> B[Scheduler Agent]
     B --> C[Load user-ticker subscriptions]
-    C --> D[Create pipeline jobs<br/>one per user-ticker]
-    D --> E[Pipeline Execution]
+    C --> D[Check data freshness<br/>in Database]
+    D --> D1{Data Fresh?}
+    D1 -->|No<br/>> 4 hours old| D2[Enqueue Data Collection Job<br/>Agent picks up independently]
+    D1 -->|Yes| E[Enqueue Pipeline Jobs<br/>per user-ticker]
+    D2 --> E
     
-    subgraph Pipeline [Pipeline Execution per job]
-        direction TB
-        S1[Stage 1: Data Collection<br/>Trigger Data Collection Agent<br/>Agent reads queries from DB<br/>Agent writes data to DB<br/>Wait & Handle errors/retries] --> S2[Stage 2: Analysis<br/>Trigger Analysis Agent<br/>Agent reads data from DB<br/>Agent writes analysis to DB<br/>Wait & Handle errors/retries]
-        S2 --> S3[Stage 3: Content Generation<br/>Trigger Content Gen Agent<br/>Agent reads analysis from DB<br/>Agent writes newsletter to DB<br/>Wait & Handle errors/retries]
-        S3 --> S4[Stage 4: Quality Assurance<br/>Trigger QA Agent<br/>Agent reads newsletter from DB<br/>Agent writes approval to DB]
-        S4 --> S4B{Approved?}
-        S4B -->|No| S4C[Retry/fail]
-        S4B -->|Yes| S5[Stage 5: Delivery<br/>Trigger Delivery Agent<br/>Agent reads newsletter from DB<br/>Agent writes metrics to DB<br/>Wait & Handle errors/retries]
-        S4C --> S5
+    E --> E1[Enqueue Analysis Job<br/>to Queue]
+    E1 --> E2[Enqueue Content Gen Job<br/>with dependency]
+    E2 --> E3[Enqueue QA Job<br/>with dependency]
+    E3 --> E4[Enqueue Delivery Job<br/>with dependency]
+    
+    subgraph Queue [Job Queue - BullMQ]
+        Q1[Analysis Job]
+        Q2[Content Gen Job]
+        Q3[QA Job]
+        Q4[Delivery Job]
     end
     
-    E --> Pipeline
-    Pipeline --> F[Collect metrics & write to Database]
-    F --> G[Learning Agent reads metrics from DB independently]
-    G --> H[Return pipeline results]
+    E1 --> Q1
+    E2 --> Q2
+    E3 --> Q3
+    E4 --> Q4
+    
+    subgraph Agents [Agents Execute Independently]
+        direction TB
+        A1[Analysis Agent<br/>Picks up job from queue<br/>Reads data from DB<br/>Writes analysis to DB<br/>Marks job complete]
+        A2[Content Gen Agent<br/>Picks up job from queue<br/>Reads analysis from DB<br/>Reads user prefs from DB<br/>Writes newsletter to DB<br/>Marks job complete]
+        A3[QA Agent<br/>Picks up job from queue<br/>Reads newsletter from DB<br/>Writes approval to DB<br/>Marks job complete]
+        A4[Delivery Agent<br/>Picks up job from queue<br/>Reads approved newsletter from DB<br/>Sends email<br/>Writes metrics to DB<br/>Marks job complete]
+    end
+    
+    Q1 --> A1
+    Q2 --> A2
+    Q3 --> A3
+    Q4 --> A4
+    
+    A3 --> A3B{Approved?}
+    A3B -->|No| A3C[Enqueue Content Gen<br/>Retry Job]
+    A3B -->|Yes| A4
+    A3C --> Q2
+    
+    A1 --> DB[(Database<br/>All agents read/write<br/>independently)]
+    A2 --> DB
+    A3 --> DB
+    A4 --> DB
+    
+    DB --> F[Scheduler queries DB<br/>for pipeline status]
+    F --> G[Learning Agent reads metrics<br/>from DB independently<br/>Daily at midnight]
+    G --> H[Return orchestration results]
 "
 />
