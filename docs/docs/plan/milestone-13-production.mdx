@@ -56,10 +56,11 @@ Make the system production-ready with comprehensive monitoring, error handling, 
 ### Independent Agent Scheduling (Architecture Documentation)
 
 - ✅ **Architecture Clarification**: Document and formalize the independent scheduling architecture that was established in earlier milestones:
-  - Query Strategy: Weekly/Daily (entity graph vs. queries) - established in Milestone 5
-  - Data Collection: Every 1-4 hours (configurable per ticker) - established in Milestone 3, enhanced in Milestone 6
-  - Newsletter Generation: Daily at 6 AM or user-defined - established in Milestone 2
-  - Learning: Daily at midnight - established in this milestone
+  - Scheduler is database-driven with admin-configurable schedules (established in Milestone 1)
+  - Query Strategy: Admin-configurable schedules (e.g., weekly entity graph, daily optimization) - established in Milestone 5
+  - Data Collection: Admin-configurable intervals (e.g., every 1-4 hours) - established in Milestone 3, enhanced in Milestone 6
+  - Newsletter Generation: Admin-configurable pipeline schedules - established in Milestone 2
+  - Learning: Admin-configurable schedule (e.g., daily at midnight) - established in this milestone
 - ✅ Event-driven communication through shared database (architecture pattern)
 - ✅ Agents can be scaled horizontally independently (architecture pattern)
 

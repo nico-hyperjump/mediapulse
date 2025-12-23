@@ -18,12 +18,12 @@ The system uses a **modular, event-driven architecture** where agents run indepe
   chart="
 flowchart TB
     subgraph Continuous [Continuous Data Pipeline]
-        QS[Query Strategy Agent<br/>• Entity Graph: Weekly<br/>• Query Optimization: Daily<br/>• Query Generation: On-demand]
-        DC[Data Collection Agent<br/>• Runs every 1-4 hours<br/>• Independent of Query Strategy<br/>• Uses latest queries from DB]
+        QS[Query Strategy Agent<br/>• Scheduled via JobTemplate<br/>• Admin-configurable schedules<br/>• Query Generation: On-demand]
+        DC[Data Collection Agent<br/>• Scheduled via JobTemplate<br/>• Admin-configurable intervals<br/>• Independent of Query Strategy<br/>• Uses latest queries from DB]
     end
     
     subgraph Newsletter [Newsletter Generation Pipeline]
-        Scheduler[Scheduler Agent<br/>• Daily at 6 AM<br/>• Or user-defined schedule]
+        Scheduler[Scheduler Agent<br/>• Database-driven schedules<br/>• Admin-configurable<br/>• Executes pipelines from DB]
         Analysis[Analysis Agent<br/>• Triggered by Scheduler<br/>• Reads collected data from DB<br/>• Works independently]
         Content[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Sequential per user<br/>• Works independently]
         QA[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Works independently]
@@ -31,7 +31,7 @@ flowchart TB
     end
     
     subgraph Background [Background Agents]
-        Learning[Learning Agent<br/>• Daily at midnight<br/>• Analyzes all metrics]
+        Learning[Learning Agent<br/>• Scheduled via JobTemplate<br/>• Admin-configurable<br/>• Analyzes all metrics]
     end
     
     QS -->|Writes entity graph<br/>& queries to DB| DB[(Shared Database)]
@@ -78,9 +78,13 @@ flowchart TD
 
 **Schedule**:
 
-- **Entity Graph Refresh**: Weekly (configurable per ticker)
-- **Query Optimization**: Daily (analyzes previous day's performance)
-- **Query Generation**: On-demand or when entity graph updates
+- Schedules are created by admins via the admin interface
+- Each schedule references a `JobTemplate` that defines the agent and parameters
+- Parameter expansion can be configured (e.g., expand to all tickers)
+- Examples:
+  - Entity Graph Refresh: Weekly schedule with ticker expansion
+  - Query Optimization: Daily schedule with ticker expansion
+  - Query Generation: On-demand or triggered by events
 
 ### Data Collection Agent
 
@@ -106,10 +110,11 @@ flowchart TD
 
 **Schedule**:
 
-- **Default**: Every 2-4 hours (configurable per ticker)
-- **High-priority tickers**: Every 1 hour
-- **Low-priority tickers**: Every 6-12 hours
+- Schedules are created by admins via the admin interface
+- Each schedule references a `JobTemplate` for the Data Collection agent
+- Parameter expansion can be configured to process multiple tickers
 - Runs independently - doesn't wait for Query Strategy
+- Example: Interval-based schedule (e.g., every 4 hours) with ticker expansion
 
 ### Newsletter Generation Pipeline
 
@@ -142,8 +147,11 @@ flowchart TD
 
 **Schedule**:
 
-- **Default**: Daily at 6 AM
-- **User-defined**: User can define a custom schedule for each newsletter
+- Pipeline is defined in the `Pipeline` table by admins
+- Schedule references the pipeline (stored in `Schedule` table)
+- Admin-configurable timing (cron, interval, or on-demand)
+- Parameter expansion can be configured (e.g., expand to all user-ticker subscriptions)
+- User-defined schedules can be created per user-ticker subscription
 
 ## Event-Driven Communication
 
@@ -169,7 +177,7 @@ sequenceDiagram
     DC->>DC: Collect data from sources
     DC->>DB: Store collected data (timestamped)
 
-    Note over Scheduler: Daily 6 AM: Newsletter Generation
+    Note over Scheduler: Scheduled: Newsletter Generation Pipeline
     Scheduler->>DB: Check data freshness
     alt Data stale
         Scheduler->>DC: Trigger immediate collection
@@ -262,11 +270,13 @@ flowchart LR
 
 ### 2. **Independent Scheduling**
 
-- Each agent has its own optimal schedule
-- Query Strategy: Weekly/Daily (entity graph vs. queries)
-- Data Collection: Every 1-4 hours (configurable)
-- Newsletter Generation: Daily or user-defined
-- Learning: Daily at midnight
+- Each agent has its own optimal schedule (admin-configurable)
+- Schedules are stored in the database (`Schedule` table)
+- Job templates define agent parameters and expansion rules
+- Query Strategy: Admin-configurable schedules (e.g., weekly entity graph, daily optimization)
+- Data Collection: Admin-configurable intervals (e.g., every 1-4 hours)
+- Newsletter Generation: Admin-configurable pipeline schedules
+- Learning: Admin-configurable schedule (e.g., daily at midnight)
 
 ### 3. **Data Freshness Management**
 

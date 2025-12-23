@@ -4,7 +4,7 @@ title: Learning Agent
 
 ## Purpose
 
-Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests. The Learning Agent runs independently on a schedule (typically daily at midnight) and creates optimized agent versions for admin review and deployment.
+Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests. The Learning Agent runs independently on an admin-configurable schedule (stored in `Schedule` table, example: daily at midnight) and creates optimized agent versions for admin review and deployment.
 
 ## Inputs
 
@@ -12,7 +12,7 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
 
 **Note**: The agent reads metrics, feedback, and performance data directly from the database. It does not receive data from other agents. The agent works independently and queries the database for all necessary information.
 
-**Schedule**: Typically runs daily at midnight (configurable via Scheduler Agent or cron). Can also be triggered manually via admin interface.
+**Schedule**: Schedules are created by admins via the admin interface (stored in `Schedule` table). Example: Daily at midnight schedule. Can also be triggered manually via admin interface.
 
 ## Configurations
 
