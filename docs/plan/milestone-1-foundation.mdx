@@ -59,7 +59,7 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
     1. Data Collection (placeholder - returns hardcoded data, stores with timestamp)
     2. Content Generation (placeholder - generates simple text, reads data from previous stage)
     3. Delivery (placeholder - saves to database only)
-  - Check data freshness before processing (basic check: compares `Newsletter.createdAt` timestamp to current time; if newsletter exists and is less than 24 hours old, skip processing)
+  - Check data freshness before processing (basic check: checks `DataSource.collectedAt` timestamp for the ticker; if data is older than 4 hours, triggers data collection; also checks if newsletter was already generated recently to avoid duplicates)
 - ✅ Sequential execution (no parallelism yet)
 - ✅ Basic error handling
 

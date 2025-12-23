@@ -21,6 +21,7 @@ Add entity discovery and intelligent query generation to improve data collection
 - ✅ **Independent Scheduling**:
   - Runs on its own schedule:
     - Entity Refresh: Weekly (configurable per ticker) - updates basic entity list
+    - Query Optimization: Daily (analyzes previous day's query performance) - basic performance tracking only in this milestone, full optimization in later milestones
     - Query Generation: On-demand or when entity list updates
   - Operates independently - Data Collection Agent reads queries from database
 - ✅ **Basic Entity Discovery**:
@@ -73,7 +74,7 @@ gantt
 - Simple entity discovery (no SEC filings parsing yet)
 - Hardcoded competitor lists or basic API
 - No entity relationship graph (simple flat entity storage only)
-- No query optimization based on historical performance (only basic performance tracking for future use)
+- Basic query optimization schedule (daily runs, but only tracks performance; full optimization logic in later milestones)
 - Basic query generation only (no AI-enhanced query variants yet)
 
 ## Success Criteria
