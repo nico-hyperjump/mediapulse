@@ -70,6 +70,14 @@ Key entities:
 - `AgentPromptVersion` - Prompt template versioning
 - `AnalysisTypeRegistry` - Registered analysis types and their metadata
 
+### Scheduler Tables
+
+- `AgentRegistry` - Agent metadata and registration (agents register themselves here)
+- `Schedule` - Admin-created schedules (cron, interval, or on-demand)
+- `JobTemplate` - Reusable job definitions with default parameters and expansion config
+- `Pipeline` - Multi-agent workflow definitions with dependencies
+- `ScheduleExecution` - Schedule execution history and tracking
+
 ## Analysis Plugin System
 
 The Analysis Agent uses a **plugin-based architecture** that allows analysis types to be dynamically registered, configured, and enabled/disabled without code deployments. This design provides maximum flexibility for managing analysis capabilities.

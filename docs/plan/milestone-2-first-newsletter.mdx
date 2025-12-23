@@ -58,7 +58,8 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 ### Scheduler Agent (Update)
 
 - ✅ Newsletter pipeline triggered by scheduler:
-  - Default schedule: Daily at 6 AM
+  - Pipeline defined in `Pipeline` table (admin-configurable)
+  - Schedule created in `Schedule` table (admin-configurable timing: cron, interval, or on-demand)
   - User-defined schedules supported (per newsletter via `UserTicker` configuration)
   - Checks data freshness before processing:
     - Checks `DataSource.collectedAt` timestamp for the ticker (data freshness check)

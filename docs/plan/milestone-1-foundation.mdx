@@ -27,6 +27,11 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
   - `Newsletter` - Generated newsletters (with `createdAt` timestamp for freshness tracking)
   - `NewsletterContent` - Newsletter content (simple text field)
   - `AgentConfig` - Basic configuration storage
+  - `AgentRegistry` - Agent metadata and registration
+  - `Schedule` - Admin-created schedules
+  - `JobTemplate` - Reusable job definitions
+  - `Pipeline` - Multi-agent workflow definitions
+  - `ScheduleExecution` - Schedule execution history
   - Note: Job tracking handled by BullMQ/Redis (no database tables needed for this milestone)
 - ✅ Database migrations and seed scripts
 - ✅ Redis setup for BullMQ queue system
@@ -53,8 +58,12 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
 ### Scheduler Agent (Minimal)
 
 - ✅ Basic scheduler that can:
-  - Run on a schedule (cron or interval) - default daily at 6 AM
-  - Create jobs for user-ticker combinations (one job per user-ticker pair)
+  - Load schedules from database (`Schedule` table)
+  - Load job templates from database (`JobTemplate` table)
+  - Load pipelines from database (`Pipeline` table)
+  - Discover agents from database (`AgentRegistry` table)
+  - Run on schedules (cron or interval) - configured via admin interface
+  - Create jobs for user-ticker combinations (one job per user-ticker pair) via parameter expansion
   - Execute a simple 3-stage newsletter pipeline sequentially:
     1. Data Collection (placeholder - returns hardcoded data, stores with timestamp)
     2. Content Generation (placeholder - generates simple text, reads data from previous stage)
@@ -62,6 +71,7 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
   - Check data freshness before processing (basic check: checks `DataSource.collectedAt` timestamp for the ticker; if data is older than 4 hours, triggers data collection; also checks if newsletter was already generated recently to avoid duplicates)
 - ✅ Sequential execution (no parallelism yet)
 - ✅ Basic error handling
+- ✅ Database tables: `AgentRegistry`, `Schedule`, `JobTemplate`, `Pipeline`, `ScheduleExecution`
 
 ### Web Application (Minimal)
 
