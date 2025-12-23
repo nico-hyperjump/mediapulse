@@ -4,13 +4,15 @@ title: Learning Agent
 
 ## Purpose
 
-Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests.
+Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests. The Learning Agent runs independently on a schedule (typically daily at midnight) and creates optimized agent versions for admin review and deployment.
 
 ## Inputs
 
 - None (agent reads all data from database independently)
 
 **Note**: The agent reads metrics, feedback, and performance data directly from the database. It does not receive data from other agents. The agent works independently and queries the database for all necessary information.
+
+**Schedule**: Typically runs daily at midnight (configurable via Scheduler Agent or cron). Can also be triggered manually via admin interface.
 
 ## Configurations
 
@@ -183,14 +185,16 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
    - Store version in `AgentVersion` table with status 'draft'
    - Include optimization rationale and expected improvements in metadata
    - Link version to performance metrics for comparison
+   - **Note**: The Learning Agent creates `AgentVersion` records, not `AgentConfig` updates. Agent versions are separate from runtime configurations.
    - New versions require admin approval before production deployment
 
-9. **Update Configurations** (if auto-update enabled):
+9. **Configuration Updates** (if auto-update enabled):
 
-   - Apply approved optimizations to draft versions
-   - Update A/B test traffic splits
-   - Write updated configurations to database
-   - Note: Production deployments require admin approval via admin dashboard
+   - Learning Agent does NOT directly update `AgentConfig` for production agents
+   - Instead, it creates new `AgentVersion` records with optimized configurations
+   - Admins review and promote versions through the versioning system
+   - A/B test traffic splits can be updated automatically if configured
+   - Note: Production deployments always require admin approval via admin dashboard
 
 10. **Storage**: Write all analysis results, recommendations, and new configurations to database
 

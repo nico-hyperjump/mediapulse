@@ -4,7 +4,15 @@ title: Scheduler Agent
 
 ## Purpose
 
-Orchestrate the newsletter generation pipeline by enqueuing jobs for independent agent execution. The scheduler checks data freshness, creates jobs for each stage of the pipeline, and enqueues them to the job queue. Agents execute independently, reading from and writing to the database. The scheduler does not wait for agent completion but tracks pipeline status through the database.
+Orchestrate the newsletter generation pipeline by enqueuing jobs for independent agent execution. The scheduler checks data freshness, creates jobs for each stage of the pipeline, and enqueues them to the job queue with proper dependencies. Agents execute independently as BullMQ workers, reading from and writing to the database. The scheduler does not wait for agent completion but tracks pipeline status through the database.
+
+**Key Responsibilities**:
+- Schedule periodic newsletter generation (daily, weekly, or user-defined)
+- Check data freshness and trigger collection if needed
+- Create and enqueue jobs for each pipeline stage (analysis, content generation, QA, delivery)
+- Manage job dependencies to ensure proper execution order
+- Monitor pipeline status through database queries
+- Handle retries for failed jobs
 
 ## Inputs
 
@@ -32,8 +40,9 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
       'delivery'
     ],
     dataFreshness: {
-      thresholdHours: 4, // Trigger data collection if data is older than this
-      triggerCollectionOnStale: true // Whether to trigger collection if data is stale
+      thresholdHours: 4, // Trigger data collection if data is older than this (default: 4 hours)
+      triggerCollectionOnStale: true, // Whether to trigger collection if data is stale
+      waitForCollection: false // Whether to wait for collection to complete before proceeding (default: false - uses existing data if collection is in progress)
     },
     parallelism: {
       analysis: true, // Can run for multiple tickers in parallel
@@ -104,12 +113,18 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
 
 ## Process
 
-1. **Initialize**: Load schedule config, connect to job queue
+1. **Initialize**: 
+   - Load schedule config from database (`AgentConfig` table, key: `scheduler`)
+   - Connect to job queue (BullMQ with Redis)
+   - Load user-ticker subscriptions from database
+   - Initialize job dependency tracking
 
 2. **Data Freshness Check** (for each user-ticker subscription):
 
    - Check timestamp of latest collected data in database
-   - If data is stale (> 4 hours old), trigger Data Collection Agent immediately by enqueuing a job
+   - If data is stale (older than `thresholdHours`), enqueue a high-priority Data Collection Agent job
+   - If `waitForCollection` is `true`, wait for collection to complete before proceeding (blocks pipeline)
+   - If `waitForCollection` is `false` (default), proceed with existing data even if stale (non-blocking)
    - Note: Data Collection Agent also runs independently every 1-4 hours, so this is only needed if data is stale when newsletter generation is triggered
 
 3. **Job Creation** (for each user-ticker subscription):
@@ -127,16 +142,19 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
      - Agent reads collected data from database
      - Agent performs analysis and writes results to database
      - Agent completes job and marks status in database
-   - **Content Generation Agent Job**: Enqueued after Analysis (or with dependency)
+   - **Content Generation Agent Job**: Enqueued after Analysis (with dependency)
      - Agent picks up job from queue independently
      - Agent reads analysis results and user preferences from database
      - Agent generates newsletter and writes to database
      - Agent completes job and marks status in database
-   - **Quality Assurance Agent Job**: Enqueued after Content Generation
+     - **Note**: Content generation runs sequentially per user-ticker subscription to ensure proper personalization. Multiple user-ticker subscriptions can be processed in parallel by different queue workers.
+   - **Quality Assurance Agent Job**: Enqueued after Content Generation (with dependency)
      - Agent picks up job from queue independently
      - Agent reads newsletter from database
      - Agent validates content and writes approval status to database
-     - If not approved, enqueue Content Generation retry job
+     - If not approved, writes `requiresRevision: true` to database
+     - Scheduler (or separate retry mechanism) can enqueue Content Generation retry job based on QA results
+     - Note: QA Agent does not directly trigger retries; it only writes approval status to database
    - **Delivery Agent Job**: Enqueued after QA approval
      - Agent picks up job from queue independently
      - Agent reads approved newsletter from database
@@ -160,17 +178,21 @@ This is the configuration for the scheduler agent. It is stored in the `AgentCon
 
 7. **Parallelization**:
 
-   - Multiple user-ticker jobs can run in parallel
+   - Multiple user-ticker subscriptions can be processed in parallel
    - Analysis jobs for different tickers run in parallel
-   - Content generation runs sequentially per user (personalization)
-   - Delivery jobs run in parallel
+   - Content generation runs sequentially per user (to ensure proper personalization and avoid conflicts)
+   - Multiple users can have their content generated in parallel (different queue workers)
+   - Delivery jobs run in parallel (multiple recipients can receive newsletters simultaneously)
 
 8. **Error Handling**:
 
-   - Failed jobs are retried with exponential backoff
+   - Failed jobs are retried with exponential backoff (configured in `retry` section)
+   - Job dependencies can timeout if upstream jobs fail repeatedly
    - Log errors to database for monitoring
-   - Notify on critical failures
+   - Notify on critical failures (via configured notification channels)
    - Dead-letter queue for jobs that exceed max retries
+   - Pipeline continues with partial results if some jobs fail (non-blocking)
+   - Failed newsletter generation for one user-ticker doesn't block others
 
 9. **Metrics Collection**:
 

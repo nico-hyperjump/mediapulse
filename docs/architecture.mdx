@@ -27,26 +27,28 @@ mediapulse/
 │   │   │   ├── monitoring/
 │   │   │   └── api/
 │   │   └── components/
-│   └── worker/                  # Background job processor
+│   └── worker/                  # Background job processor (BullMQ workers)
 │       └── agents/
-│           ├── scheduler/
-│           ├── query-strategy/
-│           ├── data-collection/
-│           ├── analysis/
-│           ├── content-generation/
-│           ├── quality-assurance/
-│           ├── delivery/
-│           └── learning/
+│           ├── scheduler/       # Scheduler agent implementation
+│           ├── query-strategy/  # Query Strategy agent implementation
+│           ├── data-collection/ # Data Collection agent implementation
+│           ├── analysis/        # Analysis agent + plugin implementations
+│           ├── content-generation/ # Content Generation agent implementation
+│           ├── quality-assurance/ # QA agent implementation
+│           ├── delivery/        # Delivery agent implementation
+│           └── learning/        # Learning agent implementation
 ├── packages/
 │   ├── shared/                  # Shared types and utilities
 │   ├── database/                # Prisma schema and migrations
-│   ├── agents/                  # Agent implementations
+│   ├── agents/                  # Shared agent utilities and base classes (optional)
 │   ├── ai/                      # AI/LLM integration layer
 │   └── email/                   # Email templates and sending
 ├── prisma/
 │   └── schema.prisma
 └── package.json                 # Turborepo monorepo config
 ```
+
+**Note**: Agent implementations are in `apps/worker/agents/`. The `packages/agents/` directory (if it exists) would contain shared utilities, base classes, or common agent code that multiple agents use.
 
 ## Database Schema
 
@@ -70,7 +72,9 @@ Key entities:
 
 ## Analysis Plugin System
 
-The Analysis Agent uses a **plugin-based architecture** that allows analysis types to be dynamically registered, configured, and executed without code changes. This design provides maximum flexibility for adding, removing, or modifying analysis capabilities.
+The Analysis Agent uses a **plugin-based architecture** that allows analysis types to be dynamically registered, configured, and enabled/disabled without code deployments. This design provides maximum flexibility for managing analysis capabilities.
+
+**Important Distinction**: Plugin metadata (schemas, templates, enable/disable flags) is stored in the database, but plugin implementation code must be part of the codebase. The database registry controls which plugins are active, but does not store executable code.
 
 ### Plugin Registry
 
@@ -82,16 +86,17 @@ Analysis types are registered in the `AnalysisTypeRegistry` database table, whic
   - `version: string` - Plugin version
   - `description: string` - What the analysis does
   - `enabled: boolean` - Whether the analysis type is active
-  - `configSchema: object` - Zod schema for configuration validation
-  - `outputSchema: object` - Zod schema for output validation
+  - `configSchema: object` - Zod schema for configuration validation (JSON representation)
+  - `outputSchema: object` - Zod schema for output validation (JSON representation)
   - `sectionTemplate?: string` - Optional template for content generation
 
 ### Dynamic Loading Mechanism
 
 1. **Plugin Discovery**: On initialization, the Analysis Agent queries `AnalysisTypeRegistry` for all enabled analysis types
-2. **Plugin Loading**: Each registered analysis type is loaded with its configuration from `AgentConfig`
-3. **Runtime Execution**: Analysis types are executed in parallel based on the `analysisTypes` parameter
-4. **Hot Reload**: Changes to the registry or configurations trigger agent re-initialization without restart
+2. **Plugin Code Loading**: Plugin implementations are loaded from the codebase (not from database) based on the registry IDs
+3. **Configuration Loading**: Each registered analysis type loads its configuration from `AgentConfig`
+4. **Runtime Execution**: Analysis types are executed in parallel based on the `analysisTypes` parameter
+5. **Hot Reload**: Changes to the registry (enable/disable) or configurations trigger agent re-initialization without restart
 
 ### Plugin Interface
 
@@ -111,13 +116,15 @@ interface AnalysisPlugin {
 
 ### Adding New Analysis Types
 
-New analysis types can be added through:
+New analysis types require two steps:
 
-1. **Admin Interface**: Register via `/admin/agents/analysis-types` dashboard
-2. **Database Direct**: Insert into `AnalysisTypeRegistry` table
-3. **Configuration**: Add analysis type config to `AgentConfig` for the analysis agent
+1. **Code Implementation**: Write and deploy the plugin implementation code as part of the application
+2. **Database Registration**: Register the plugin metadata in the database:
+   - **Admin Interface**: Register via `/admin/agents/analysis-types` dashboard
+   - **Database Direct**: Insert into `AnalysisTypeRegistry` table
+   - **Configuration**: Add analysis type config to `AgentConfig` for the analysis agent
 
-Once registered, the analysis type is immediately available for use without code deployment.
+Once both code is deployed and metadata is registered, the analysis type is immediately available for use. The database registration can be done without code deployment, but the code must exist first.
 
 ### Configuration Integration
 
@@ -150,7 +157,9 @@ The configuration hierarchy applies:
 
 - **Database Tables**:
 
-  - `AgentConfig` - Per-agent configurations (JSONB column with versioning)
+  - `AgentConfig` - Per-agent configurations (JSONB column with versioning) - Runtime configurations
+  - `AgentVersion` - Agent version snapshots (configs, prompts, metadata) - Historical versions for rollback
+  - `AgentPromptVersion` - Prompt template versions (separate from configs)
   - `SourceConfig` - Data source configurations (news sites, APIs, etc.)
   - `UserPreferences` - User-specific preferences
   - `SystemConfig` - Global system settings
@@ -159,11 +168,19 @@ The configuration hierarchy applies:
 
 - **Configuration Loading**:
 
-  - Configs loaded at agent initialization from database
-  - Cached with TTL (configurable via SystemConfig)
-  - Hot-reloadable via admin API endpoint
-  - Versioned for rollback capability
-  - Config changes trigger agent re-initialization
+  - Configs loaded at agent initialization from database (`AgentConfig` table)
+  - Active version determined by `AgentVersionDeployment` table
+  - Configs cached with TTL (configurable via SystemConfig)
+  - Hot-reloadable via admin API endpoint (triggers agent re-initialization)
+  - Versioned for rollback capability (via `AgentVersion` table)
+  - Config changes trigger agent re-initialization (no restart required)
+
+- **Configuration vs Versioning**:
+
+  - `AgentConfig`: Runtime configuration that agents read during execution
+  - `AgentVersion`: Historical snapshots of configurations for version control and rollback
+  - When a version is deployed, `AgentConfig` is updated to match the version's config
+  - Agents always read from `AgentConfig` at runtime, not directly from `AgentVersion`
 
 - **Configuration Hierarchy** (priority order):
 

@@ -155,7 +155,11 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
    - If only warnings: `approved = true`, add recommendations
    - If passed: `approved = true`
 
-7. **Return**: Validation results
+7. **Write Results**: Store validation results and approval status in database
+
+8. **Note on Retries**: The QA Agent does not directly trigger content generation retries. It writes `requiresRevision: true` to the database. The Scheduler Agent (or a separate retry mechanism) monitors QA results and can enqueue a Content Generation retry job if needed.
+
+9. **Return**: Validation results
 
 ## Sequence Diagram
 

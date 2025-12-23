@@ -125,8 +125,11 @@ flowchart TD
     B --> C[Check Data Freshness<br/>in Database]
     C --> D{Data Fresh<br/>enough?}
     D -->|Yes<br/>< 4 hours old| E[Analysis Agent<br/>• Loads enabled analysis plugins<br/>• Reads collected data<br/>• Executes registered analysis types<br/>• Dynamic parallel execution]
-    D -->|No| F[Trigger Data Collection<br/>Agent immediately]
-    F --> E
+    D -->|No<br/>Stale data| F[Enqueue Data Collection Job<br/>High priority]
+    F --> F1{Wait for<br/>collection?}
+    F1 -->|Yes| F2[Wait for collection<br/>to complete]
+    F1 -->|No - default| E[Use existing data<br/>Continue pipeline]
+    F2 --> E
     E --> G[Store Analysis Results<br/>in Database<br/>Generic structure with all types]
     G --> H[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Reads user prefs from DB<br/>• Generates newsletter<br/>• Writes newsletter to DB]
     H --> I[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Validates content<br/>• Checks compliance<br/>• Writes approval status to DB]
@@ -196,7 +199,8 @@ sequenceDiagram
         Delivery->>User: Newsletter with feedback buttons
         User->>DB: Submit section feedback (Like/Dislike, Useful/Irrelevant)
     else Not Approved
-        Note over Content: Scheduler may retry content generation
+        QA->>DB: Write requiresRevision: true
+        Note over Scheduler: Scheduler or retry mechanism<br/>can enqueue Content Gen retry job<br/>based on QA results
     end
 
     Note over Learning: Daily midnight: Learning
@@ -298,19 +302,30 @@ flowchart LR
 
 ### Per-Agent Error Handling
 
-- **Query Strategy**: Retries entity discovery, falls back to cached entity graph
-- **Data Collection**: Continues with other sources if one fails, retries with backoff
-- **Analysis**: Uses cached analysis if fresh data unavailable
-- **Content Generation**: Retries with different prompts on failure
-- **QA**: Flags for manual review if repeated failures
-- **Delivery**: Retries with exponential backoff, dead-letter queue
+- **Query Strategy**: Retries entity discovery, falls back to cached entity graph, logs errors to database
+- **Data Collection**: Continues with other sources if one fails, retries with exponential backoff, marks failed sources for health monitoring
+- **Analysis**: Returns partial results if some analysis types fail, logs errors per plugin, continues with successful analyses
+- **Content Generation**: Retries with different prompts on failure (up to max retries), falls back to simpler templates if needed
+- **QA**: Flags for manual review if repeated failures, writes detailed error information to database
+- **Delivery**: Retries with exponential backoff, dead-letter queue for permanently failed deliveries, tracks bounce rates
+- **Learning**: Continues analysis even if some metrics are unavailable, logs warnings for incomplete data
+
+### Job Queue Error Handling
+
+- **BullMQ Retry Logic**: All jobs have configurable retry attempts with exponential backoff
+- **Failed Jobs**: Jobs that exceed max retries are moved to dead-letter queue for manual review
+- **Job Dependencies**: Failed jobs don't block dependent jobs indefinitely; dependencies can timeout
+- **Error Logging**: All errors are logged to database with context for debugging
 
 ### System-Level Resilience
 
-- **Database Failures**: Agents queue jobs for retry when DB is available
-- **Queue Failures**: Jobs persisted to database as backup
-- **Agent Failures**: Other agents continue operating
-- **Data Staleness**: Newsletter pipeline triggers fresh collection if needed
+- **Database Failures**: Agents queue jobs for retry when DB is available, use connection pooling with retries
+- **Queue Failures**: Jobs persisted to database as backup, Redis replication for high availability
+- **Agent Failures**: Other agents continue operating independently, failed agent jobs are retried automatically
+- **Data Staleness**: Newsletter pipeline triggers fresh collection if needed, can proceed with existing data if collection fails
+- **Partial Failures**: System continues operating with partial data (e.g., some analysis types fail but others succeed)
+- **Circuit Breakers**: External API calls use circuit breakers to prevent cascade failures
+- **Health Monitoring**: All agents report health status, failed agents are automatically restarted
 
 ## Configuration & Monitoring
 

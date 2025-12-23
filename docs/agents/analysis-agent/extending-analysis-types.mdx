@@ -12,11 +12,14 @@ This guide walks you through the process of adding a new analysis type, using "R
 
 Analysis types are implemented as plugins that conform to a standard interface. Plugins are:
 
-- **Registered** in the `AnalysisTypeRegistry` database table
-- **Loaded dynamically** by the Analysis Agent at runtime
-- **Configured** via the `AgentConfig` table
+- **Implemented in code** - Plugin code must be written and deployed as part of the application codebase
+- **Registered** in the `AnalysisTypeRegistry` database table (stores metadata, schemas, templates - not code)
+- **Loaded dynamically** by the Analysis Agent at runtime (discovers enabled plugins from registry, loads code from codebase)
+- **Configured** via the `AgentConfig` table (type-specific settings)
 - **Executed in parallel** with other analysis types
-- **Automatically integrated** into content generation
+- **Automatically integrated** into content generation (sections generated from plugin templates)
+
+**Important**: The database registry stores plugin metadata (schemas, templates, enable/disable flags), but the actual plugin implementation code must be part of the deployed codebase. This ensures type safety, security, and proper versioning of plugin logic.
 
 ## Step-by-Step Guide
 
