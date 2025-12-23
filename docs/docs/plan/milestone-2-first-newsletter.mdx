@@ -61,10 +61,10 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
   - Default schedule: Daily at 6 AM
   - User-defined schedules supported (per newsletter via `UserTicker` configuration)
   - Checks data freshness before processing:
-    - Checks if `Newsletter` exists for user-ticker combination with `createdAt` less than 24 hours ago
-    - If newsletter is fresh, skips processing
-    - If no newsletter exists or newsletter is stale (>24 hours old), proceeds with pipeline
-  - Can trigger immediate data collection if needed (checks `DataSource` table for recent data for the ticker)
+    - Checks `DataSource.collectedAt` timestamp for the ticker (data freshness check)
+    - If data is stale (older than 4 hours), triggers immediate data collection
+    - Also checks if newsletter was already generated recently for this user-ticker to avoid duplicates
+    - If data is fresh and no recent newsletter exists, proceeds with pipeline
 
 ### Web Dashboard Updates
 
