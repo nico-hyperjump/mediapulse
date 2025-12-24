@@ -282,7 +282,7 @@ def register_lambda_agent():
 4. Orchestrator discovers and invokes agent
 
 **Note**: For serverless and event-driven agents, `lastHeartbeat` is optional since the agent may not be continuously running. The orchestrator will attempt to invoke the agent endpoint and handle failures accordingly.
-```
+
 
 ## Agent Versioning
 
@@ -532,13 +532,7 @@ interface AgentExecutionResponse {
 
 **Important**: The execution endpoint should return **immediately** (within 1-2 seconds) with an acceptance response. The actual work should be performed asynchronously. The agent reports progress and results via the database (see Status Reporting below). The orchestrator does not wait for agent completion but tracks job status through the database.
 
-### Alternative: Webhook Pattern
 
-For agents that cannot expose HTTP endpoints (e.g., n8n workflows), agents can use a **webhook pattern**:
-
-1. Agent registers a webhook URL in `AgentRegistry.endpoint.url`
-2. Orchestrator calls the webhook URL with execution request
-3. Agent processes the request and reports status via database
 
 ## Status Reporting
 
