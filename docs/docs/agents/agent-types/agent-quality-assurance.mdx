@@ -2,6 +2,10 @@
 title: Quality Assurance Agent
 ---
 
+<Callout type="info">
+ID: `quality-assurance`
+</Callout>
+
 ## Purpose
 
 Validate newsletter content for accuracy, quality, compliance, and completeness before delivery.
@@ -15,6 +19,8 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 **Note**: The agent reads newsletter content, source data, and analysis results directly from the database. It does not receive data from the Content Generation Agent or other agents. The agent works independently and queries the database for the necessary data.
 
 ## Configurations
+
+Configuration is stored in `AgentConfig` with identifier `quality-assurance` and the following structure:
 
 ```typescript
 {

@@ -2,14 +2,14 @@
 title: Content Generation Agent
 ---
 
+<Callout type="info">
+ID: `content-generation`
+</Callout>
+
 ## Purpose
 
 Transform analysis results into a well-structured, personalized newsletter with executive-friendly format. The agent dynamically generates sections based on available analysis results, allowing newsletters to adapt automatically when new analysis types are added or removed.
 
-**Note**: 
-- Multiple instances of the same agent version can run in parallel for horizontal scaling.
-- Only one version of this agent type can be active in production at a time.
-- The orchestrator distributes jobs across available agent instances using load balancing.
 
 ## Inputs
 
@@ -20,6 +20,8 @@ Transform analysis results into a well-structured, personalized newsletter with 
 **Note**: The agent reads analysis results and user preferences directly from the database. It does not receive data from the Analysis Agent. The agent works independently and queries the database for the latest analysis results and user preferences.
 
 ## Configurations
+
+Configuration is stored in `AgentConfig` with identifier `content-generation` and the following structure:
 
 ```typescript
 {

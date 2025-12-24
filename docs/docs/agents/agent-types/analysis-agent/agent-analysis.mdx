@@ -2,10 +2,10 @@
 title: Analysis Agent
 ---
 
-**Note**: 
-- Multiple instances of the same agent version can run in parallel for horizontal scaling.
-- Only one version of this agent type can be active in production at a time.
-- The orchestrator distributes jobs across available agent instances using load balancing.
+<Callout type="info">
+ID: `analysis`
+</Callout>
+
 
 ## Purpose
 
@@ -64,7 +64,7 @@ See [Extending Analysis Types](/agents/extending-analysis-types) for a complete 
 
 ## Configurations
 
-Analysis configurations are stored in `AgentConfig` with a flexible structure that supports any registered analysis type:
+Analysis configurations are stored in `AgentConfig` with identifier `analysis` and a flexible structure that supports any registered analysis type:
 
 ```typescript
 {

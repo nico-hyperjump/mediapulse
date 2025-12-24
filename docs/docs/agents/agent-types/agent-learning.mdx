@@ -2,14 +2,14 @@
 title: Learning Agent
 ---
 
+<Callout type="info">
+ID: `learning`
+</Callout>
+
 ## Purpose
 
 Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests. The Learning Agent runs independently on an admin-configurable schedule (stored in `Schedule` table, example: daily at midnight) and creates optimized agent versions for admin review and deployment.
 
-**Note**: 
-- Multiple instances of the same agent version can run in parallel for horizontal scaling.
-- Only one version of this agent type can be active in production at a time.
-- The orchestrator distributes jobs across available agent instances using load balancing.
 
 ## Inputs
 
@@ -20,6 +20,8 @@ Collect metrics, analyze user feedback, optimize content generation, and manage 
 **Schedule**: Schedules are created by admins via the admin interface (stored in `Schedule` table). Example: Daily at midnight schedule. Can also be triggered manually via admin interface.
 
 ## Configurations
+
+Configuration is stored in `AgentConfig` with identifier `learning` and the following structure:
 
 ```typescript
 {

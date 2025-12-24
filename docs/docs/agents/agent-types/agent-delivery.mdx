@@ -2,6 +2,10 @@
 title: Delivery Agent
 ---
 
+<Callout type="info">
+ID: `delivery`
+</Callout>
+
 ## Purpose
 
 Deliver approved newsletters via email and update web dashboard, track delivery status.
@@ -18,12 +22,9 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
 **Multiple Recipients**: When multiple users are subscribed to the same ticker, the Scheduler/Orchestrator creates separate delivery jobs for each user-ticker subscription. Each delivery job handles one personalized newsletter for one user. Multiple delivery jobs execute in parallel across multiple agent instances, allowing efficient delivery to all subscribers. Rate limiting (configured in `rateLimiting.emailsPerMinute`) applies across all concurrent delivery jobs to respect email provider limits.
 
-**Note**: 
-- Multiple instances of the same agent version can run in parallel for horizontal scaling.
-- Only one version of this agent type can be active in production at a time.
-- The orchestrator distributes jobs across available agent instances using load balancing.
-
 ## Configurations
+
+Configuration is stored in `AgentConfig` with identifier `delivery` and the following structure:
 
 ```typescript
 {
