@@ -67,6 +67,7 @@ The newsletter structure is dynamic and adapts to available analysis results:
 ```typescript
 {
   agentId: 'content-generation',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   ticker: string,
   userId: string,
   timestamp: Date,

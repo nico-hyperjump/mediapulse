@@ -255,6 +255,7 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 ```typescript
 {
   agentId: 'scheduler',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   executionId: string,
   timestamp: Date,
   executionTime: number,

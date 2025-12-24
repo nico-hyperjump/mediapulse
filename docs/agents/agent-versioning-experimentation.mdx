@@ -17,6 +17,27 @@ The agent versioning and experimentation system allows admins to:
 - Deploy with confidence after validation
 - Rollback instantly if issues arise
 
+## Version Tracking in Outputs
+
+**Every agent output includes version information** for traceability and debugging. All agent outputs contain an `agentVersion` field that specifies the semantic version (e.g., "1.2.3") of the agent that generated the output.
+
+### How Version is Determined
+
+- Agents read their active version from the `AgentVersionDeployment` table during initialization
+- The version corresponds to the currently deployed version for the agent in the production environment
+- The version is included in all outputs, including error outputs and partial results
+- This enables traceability: you can identify exactly which agent version generated any output in the system
+
+### Benefits
+
+- **Traceability**: Track which version of an agent generated specific outputs
+- **Debugging**: Identify version-specific issues by correlating outputs with agent versions
+- **Audit Trail**: Maintain a complete record of which agent version was responsible for each result
+- **Experimentation**: Compare outputs from different agent versions during A/B testing
+- **Rollback Analysis**: Understand the impact of version changes by tracking outputs before and after deployments
+
+The `agentVersion` field is separate from `agentId` (which identifies the agent type) and provides the specific version that generated the output. This is essential for the versioning and experimentation workflow, as it allows admins to track which version produced which results.
+
 ## Database Schema
 
 ### Core Tables

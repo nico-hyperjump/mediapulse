@@ -60,6 +60,7 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 ```typescript
 {
   agentId: 'quality-assurance',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   newsletterId: string,
   timestamp: Date,
   executionTime: number,
