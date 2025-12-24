@@ -19,7 +19,8 @@ Dynamically discover entities, maintain entity relationships, generate intellige
 2. **Dynamic Query Generation**:
 
    - Generates search queries based on current context (company identifier, time period, recent events)
-   - Creates queries for news APIs, social media, and web scraping
+   - Creates queries for use with admin-configured search sources (e.g., Serper.dev, Google Search API)
+   - Categorizes queries by type (news, socialMedia, web) for flexible routing
    - Adapts queries based on what's trending or relevant
    - Generates multi-variant queries (different phrasings, synonyms)
    - Considers query effectiveness history
@@ -316,7 +317,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
     news: Array<{
       id: string,
       query: string,
-      source: string,                    // 'newsapi', 'google', 'bloomberg', etc.
+      source?: string,                   // Optional: suggested search source ID (e.g., 'serper-dev')
       priority: 'high' | 'medium' | 'low',
       expectedRelevance: number,         // 0-1
       variants?: string[],               // Alternative phrasings

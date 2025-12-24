@@ -60,19 +60,20 @@ Implement data collection from news sources and social media.
 ### Deliverables
 
 - ✅ Data Collection Agent implementation (`packages/agents/data-collection/`)
-- ✅ News source integrations:
-  - NewsAPI integration with targeted queries
-  - Google News API integration
-  - Web scraping framework (Playwright + Cheerio):
-    - Bloomberg scraping (with selectors)
-    - Reuters scraping
-    - WSJ scraping (if accessible)
-    - CNBC scraping
-  - RSS feed parsing with company filtering
-- ✅ Social media monitoring:
-  - Twitter/X API integration (v2)
-  - Reddit API integration
-  - Query-based search with quality filters
+- ✅ Search source configuration system:
+  - Admin-configurable search sources (e.g., Serper.dev, Google Search API)
+  - Search source authentication and API key management
+  - Response mapping configuration per source
+  - Rate limiting per search source
+- ✅ Query-based data collection:
+  - Retrieves queries from Query Strategy Agent (stored in database)
+  - Queries admin-configured search sources with generated queries
+  - Extracts URLs from search results
+- ✅ Web page fetching:
+  - Fetches HTML content from search result URLs
+  - Extracts main content (removes ads, navigation)
+  - Handles JavaScript-rendered pages when necessary
+  - Respects robots.txt and rate limits
 - ✅ Rate limiting and retry mechanisms per source
 - ✅ Data deduplication system:
   - Title similarity matching
