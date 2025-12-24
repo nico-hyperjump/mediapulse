@@ -27,16 +27,11 @@ mediapulse/
 │   │   │   ├── monitoring/
 │   │   │   └── api/
 │   │   └── components/
-│   └── worker/                  # Background job processor (BullMQ workers)
-│       └── agents/
-│           ├── scheduler/       # Scheduler agent implementation
-│           ├── query-strategy/  # Query Strategy agent implementation
-│           ├── data-collection/ # Data Collection agent implementation
-│           ├── analysis/        # Analysis agent + plugin implementations
-│           ├── content-generation/ # Content Generation agent implementation
-│           ├── quality-assurance/ # QA agent implementation
-│           ├── delivery/        # Delivery agent implementation
-│           └── learning/        # Learning agent implementation
+│   └── scheduler/              # Scheduler service (invokes agents via HTTP)
+│       └── src/
+│           ├── scheduler.ts    # Main scheduler implementation
+│           ├── agent-client.ts # HTTP client for agent invocations
+│           └── ...
 ├── packages/
 │   ├── shared/                  # Shared types and utilities
 │   ├── database/                # Prisma schema and migrations
@@ -48,7 +43,7 @@ mediapulse/
 └── package.json                 # Turborepo monorepo config
 ```
 
-**Note**: Agent implementations are in `apps/worker/agents/`. The `packages/agents/` directory (if it exists) would contain shared utilities, base classes, or common agent code that multiple agents use.
+**Note**: Agents are **language-agnostic** and can be implemented anywhere. They register themselves in the database and expose HTTP endpoints. See [Agent Specification](./agents/agent-specification) for details. The `packages/agents/` directory (if it exists) would contain shared utilities, SDKs, or helper libraries for agent development.
 
 ## Database Schema
 
@@ -72,7 +67,8 @@ Key entities:
 
 ### Scheduler Tables
 
-- `AgentRegistry` - Agent metadata and registration (agents register themselves here)
+- `AgentRegistry` - Agent metadata and registration (agents register themselves here with HTTP endpoints)
+- `AgentJobExecution` - Tracks individual agent job executions and status
 - `Schedule` - Admin-created schedules (cron, interval, or on-demand)
 - `JobTemplate` - Reusable job definitions with default parameters and expansion config
 - `Pipeline` - Multi-agent workflow definitions with dependencies

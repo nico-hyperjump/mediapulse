@@ -6,18 +6,19 @@ title: Scheduler Agent
 
 Orchestrate and schedule all agents in the system by managing periodic tasks, pipeline workflows, and job dependencies. The scheduler is **completely generic** and **database-driven**—it has no hardcoded agent configurations. Admins create schedules, job templates, and pipelines through the admin interface, and the scheduler dynamically discovers agents and executes jobs based on database configurations.
 
-The scheduler enqueues jobs for independent agent execution based on schedules stored in the database (cron, interval, or on-demand). Agents execute independently as BullMQ workers, reading from and writing to the database. The scheduler does not wait for agent completion but tracks job status through the database.
+The scheduler invokes agents via HTTP endpoints based on schedules stored in the database (cron, interval, or on-demand). Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The scheduler does not wait for agent completion but tracks job status through the database.
 
 **Key Responsibilities**:
-- Dynamically discover and register agents from the database (no hardcoded agent list)
+- Dynamically discover agents from the database (no hardcoded agent list)
 - Execute schedules created by admins (stored in `Schedule` table)
 - Expand job templates with parameter expansion (e.g., one schedule → many jobs for many tickers)
 - Orchestrate multi-agent pipelines with job dependencies (stored in `Pipeline` table)
 - Manage different schedule types: cron expressions, intervals, and on-demand triggers
-- Create and enqueue jobs to the job queue with proper dependencies and priorities
-- Monitor job status through database queries
-- Handle retries for failed jobs
+- Invoke agent HTTP endpoints with proper parameters and authentication
+- Monitor job status through database queries (`AgentJobExecution` table)
+- Handle retries for failed jobs by re-invoking agent endpoints
 - Support manual triggers via API or admin interface
+- Validate agent responses and handle agent failures gracefully
 
 ## Inputs
 
@@ -57,7 +58,7 @@ interface SchedulerInput {
 The scheduler uses the following database tables (stored in PostgreSQL):
 
 ### `AgentRegistry`
-Stores metadata about all available agents in the system. Agents register themselves here.
+Stores metadata about all available agents in the system. Agents register themselves here. See [Agent Specification](./agent-specification) for full registration details.
 
 ```typescript
 {
@@ -65,7 +66,23 @@ Stores metadata about all available agents in the system. Agents register themse
   name: string; // Human-readable name
   description: string;
   version: string;
+  endpoint: {
+    type: 'http' | 'webhook' | 'n8n' | 'cloud-function';
+    url: string; // Full URL to agent endpoint
+    method: 'POST' | 'PUT';
+    authentication?: {
+      type: 'bearer' | 'api-key' | 'oauth';
+      token?: string;
+    };
+    timeout: number; // Request timeout in milliseconds
+    retryConfig?: {
+      maxRetries: number;
+      backoff: 'exponential' | 'linear' | 'fixed';
+      delay: number;
+    };
+  };
   inputSchema: object; // JSON Schema or Zod schema (JSON representation)
+  outputSchema: object; // JSON Schema or Zod schema (JSON representation)
   parameterTypes: {
     // Defines what parameters this agent accepts and how they can be expanded
     ticker?: {
@@ -80,6 +97,16 @@ Stores metadata about all available agents in the system. Agents register themse
     // ... other parameter types
   };
   enabled: boolean;
+  healthCheck?: {
+    endpoint: string;
+    interval: number;
+  };
+  metadata?: {
+    language?: string; // Implementation language
+    runtime?: string; // Runtime environment
+    deployment?: string; // Deployment type
+  };
+  lastHeartbeat?: Date; // Last health check timestamp
   createdAt: Date;
   updatedAt: Date;
 }
@@ -220,14 +247,17 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
     checkInterval: 60000 // How often to check for due schedules (ms)
   },
   
-  // Job queue configuration
-  queue: {
-    provider: 'bullmq',
-    redisUrl: string,
-    concurrency: 5, // Default concurrency for queue workers
-    defaultJobOptions: {
-      attempts: 3,
+  // HTTP client configuration for agent invocations
+  httpClient: {
+    timeout: 300000, // Default timeout (ms) - can be overridden per agent
+    maxConcurrentRequests: 50, // Max concurrent agent invocations
+    retryConfig: {
+      maxRetries: 3,
       backoff: { type: 'exponential', delay: 5000 }
+    },
+    connectionPool: {
+      maxSockets: 100,
+      keepAlive: true
     }
   },
   
@@ -326,28 +356,31 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 }
 ```
 
-**Note**: The scheduler returns orchestration results immediately after enqueuing jobs. Actual job and pipeline status is tracked in the database (`ScheduleExecution` table) and can be queried separately. Agents update their job status in the database as they execute independently.
+**Note**: The scheduler returns orchestration results immediately after invoking agent endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agents update their job status in the database as they execute independently.
 
 ## Process
 
 1. **Initialize**: 
    - Load scheduler config from database (`AgentConfig` table, key: `scheduler`)
-   - Connect to job queue (BullMQ with Redis)
    - Load all enabled schedules from `Schedule` table
    - Load all enabled job templates from `JobTemplate` table
    - Load all enabled pipelines from `Pipeline` table
    - Load agent registry from `AgentRegistry` table (discover available agents)
+   - Validate agent endpoints are accessible (health checks)
    - Initialize cron scheduler for all cron-based schedules
    - Initialize interval timers for all interval-based schedules
-   - Initialize job dependency tracking
+   - Initialize job dependency tracking (for pipelines)
    - Initialize ticker/identifier cache (optional, for performance when processing many tickers)
+   - Initialize HTTP client pool for agent invocations
 
 2. **Agent Discovery**:
 
    - Query `AgentRegistry` table for all enabled agents
    - Validate that agents referenced in schedules, job templates, and pipelines exist in registry
+   - Verify agent endpoints are accessible (health checks)
    - Load agent input schemas to validate job parameters
-   - Cache agent metadata for performance
+   - Cache agent metadata (endpoints, authentication, timeouts) for performance
+   - Monitor agent heartbeats and mark agents as unavailable if heartbeat is stale
 
 3. **Schedule Execution** (triggered by cron, interval, manual, or event):
 
@@ -414,13 +447,20 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
    - If user expansion needed: Expand to multiple users (see 4b)
    - If both: Expand to user-ticker combinations (see 4c)
 
-   **5c. Create Jobs**:
+   **5c. Invoke Agents**:
    - For each expanded parameter set (or single set if no expansion):
-     - Create job with merged parameters (template defaults + trigger params + expanded params)
-     - Set job priority from schedule or template
-     - Set retry config from template or schedule
-     - Set timeout from template
-     - Enqueue to job queue
+     - Generate unique `jobId` and `executionId`
+     - Create execution record in `AgentJobExecution` table with `status: 'pending'`
+     - Build execution request with merged parameters (template defaults + trigger params + expanded params)
+     - Validate parameters against agent's `inputSchema`
+     - Invoke agent HTTP endpoint (POST to `AgentRegistry.endpoint.url`)
+       - Include authentication headers if configured
+       - Set timeout from agent endpoint config or template
+       - Include `X-Job-Id` and `X-Execution-Id` headers
+     - Handle agent response:
+       - If `status: 'accepted'`: Job is queued for execution by agent
+       - If `status: 'rejected'`: Mark execution as failed, log error
+     - Apply stagger delays between batches (if configured)
    - Track job creation in `ScheduleExecution` table
 
 6. **Pipeline Orchestration**:
@@ -443,41 +483,52 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 
    **6d. Execute Pipeline Steps**:
    - For each expanded parameter set (e.g., each user-ticker pair):
-     - Create jobs for all pipeline steps
-     - Set job dependencies based on `dependsOn` relationships
+     - Create execution records for all pipeline steps in `AgentJobExecution` table
+     - Build dependency graph based on `dependsOn` relationships
+     - For steps without dependencies: Invoke agent endpoints immediately
+     - For steps with dependencies: Wait for dependency jobs to complete (check `AgentJobExecution.status`)
      - Handle conditional steps (e.g., data freshness checks)
-     - Enqueue jobs with proper dependency chain
+     - Invoke agent endpoints with proper sequencing
    - Track pipeline execution in database
 
    **6e. Conditional Steps**:
    - If step has `condition.type = 'data-freshness'`:
      - Check timestamp of latest collected data in database
-     - If data is stale, enqueue a high-priority Data Collection job first
-     - Set dependency so pipeline step waits for data collection
+     - If data is stale, invoke Data Collection agent endpoint with high priority first
+     - Wait for Data Collection job to complete (poll `AgentJobExecution.status`)
+     - Then invoke the dependent pipeline step
    - Custom conditions can be implemented via plugins
 
-7. **Independent Agent Execution**:
+7. **Agent Execution**:
 
+   - Scheduler invokes agent HTTP endpoints asynchronously
+   - Agents accept jobs immediately and return `status: 'accepted'`
+   - Agents execute work asynchronously and update `AgentJobExecution` table
    - Agents do not receive data from other agents
    - Agents read from and write to database independently
-   - Agents execute on their own schedule when jobs are available
    - No direct agent-to-agent communication
    - All coordination through database state
+   - Scheduler monitors agent execution by querying `AgentJobExecution` table
 
 8. **Job Dependencies & Status Tracking**:
 
-   - Track job status in database (pending, running, completed, failed)
-   - Use job dependencies (BullMQ) to ensure proper sequencing (for pipelines)
-   - Monitor job progress by querying database for job statuses
-   - Handle failed jobs with retry logic (exponential backoff from template/schedule config)
+   - Track job status in `AgentJobExecution` table (pending, running, completed, failed)
+   - For pipeline dependencies: Poll `AgentJobExecution.status` to wait for upstream jobs
+   - Monitor job progress by querying `AgentJobExecution` table periodically
+   - Handle failed jobs with retry logic:
+     - Check `AgentJobExecution.error.retryable` flag
+     - If retryable and retry count < max: Re-invoke agent endpoint after backoff delay
+     - If not retryable: Mark as permanently failed, notify admins
+   - Use exponential backoff from template/schedule config for retries
 
 9. **Parallelization**:
 
    - **Expanded Parameter Jobs** (e.g., per-ticker, per-user):
      - Multiple expanded items processed in parallel (controlled by `batchSize` in expansion config)
-     - Jobs for different parameter sets execute concurrently across queue workers
-     - Example: 100 tickers with `batchSize: 20` = 5 batches, each batch processes 20 tickers in parallel
+     - Scheduler invokes multiple agent endpoints concurrently (up to `batchSize`)
+     - Example: 100 tickers with `batchSize: 20` = 5 batches, each batch invokes 20 agent endpoints in parallel
      - Stagger delays between batches prevent rate limiting and resource exhaustion
+     - Agents execute work asynchronously after accepting jobs
    
    - **Single Parameter Jobs** (no expansion):
      - Single job processes all data in aggregate
@@ -492,11 +543,12 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 10. **Scalability Considerations**:
 
    - **Large Parameter Sets**: When processing hundreds of tickers/users:
-     - Batch processing prevents queue overload
-     - Stagger delays prevent API rate limits
-     - Jobs are distributed across multiple queue workers
+     - Batch processing prevents overwhelming agent endpoints
+     - Stagger delays prevent API rate limits and agent overload
+     - Multiple agent invocations happen concurrently (up to `batchSize`)
      - Failed jobs for one parameter set don't block others
      - Partial failures are handled gracefully (continue with remaining items)
+     - Agents can scale independently to handle their own load
    
    - **Dynamic Management**:
      - New tickers/users are automatically included in next scheduled run (if scope includes them)
@@ -510,13 +562,25 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 
 11. **Error Handling**:
 
-   - Failed jobs are retried with exponential backoff (configured in `JobTemplate` or `Schedule`)
-   - Job dependencies can timeout if upstream jobs fail repeatedly
-   - Log errors to database for monitoring (`ScheduleExecution` table)
-   - Notify on critical failures (via configured notification channels)
-   - Dead-letter queue for jobs that exceed max retries
-   - Pipeline continues with partial results if some jobs fail (non-blocking)
-   - Failed jobs for one schedule/template don't block others
+   - **Agent Invocation Errors** (network, timeout, agent unavailable):
+     - Retry with exponential backoff (configured in `JobTemplate` or `Schedule`)
+     - Mark agent as unavailable if health check fails
+     - Log errors to database for monitoring (`ScheduleExecution` table)
+   
+   - **Agent Execution Errors** (agent rejects job or fails during execution):
+     - Agent updates `AgentJobExecution.status: 'failed'` with error details
+     - Scheduler checks `error.retryable` flag
+     - If retryable: Re-invoke agent endpoint after backoff delay
+     - If not retryable: Mark as permanently failed, notify admins
+   
+   - **Pipeline Dependencies**:
+     - Job dependencies can timeout if upstream jobs fail repeatedly
+     - Pipeline continues with partial results if some jobs fail (non-blocking)
+   
+   - **General**:
+     - Notify on critical failures (via configured notification channels)
+     - Failed jobs for one schedule/template don't block others
+     - Agents can implement their own retry logic internally
 
 12. **Metrics Collection**:
 
@@ -633,13 +697,13 @@ flowchart TD
     S4 -->|No| S8[Create Single Job]
     
     S5 --> S9[Batch Tickers<br/>batchSize: 10-20<br/>100 tickers → 5-10 batches]
-    S9 --> S10[Create Jobs per Ticker<br/>100 tickers = 100 jobs]
-    S10 --> S11[Enqueue Jobs in Batches<br/>with staggerDelay]
+    S9 --> S10[Create Execution Records<br/>100 tickers = 100 executions]
+    S10 --> S11[Invoke Agent HTTP Endpoints<br/>in Batches with staggerDelay]
     
-    S6 --> S12[Create Jobs per User]
+    S6 --> S12[Invoke Agent per User]
     S12 --> S11
     
-    S7 --> S13[Create Jobs per<br/>User-Ticker Pair]
+    S7 --> S13[Invoke Agent per<br/>User-Ticker Pair]
     S13 --> S11
     
     S8 --> S11
@@ -647,27 +711,27 @@ flowchart TD
     S1 --> S14{Is Pipeline?}
     S14 -->|Yes| S15[Load Pipeline Steps<br/>from Database]
     S15 --> S16[Build Dependency Graph]
-    S16 --> S17[Create Jobs for Each Step<br/>with Dependencies]
+    S16 --> S17[Invoke Agents for Each Step<br/>with Dependencies]
     S17 --> S11
     
-    S11 --> Q[Job Queue - BullMQ]
+    S11 --> AG1[Agent HTTP Endpoints<br/>POST /execute]
     
-    subgraph Queue [Job Queue - BullMQ]
-        Q1[Agent Jobs<br/>Processed by Workers]
-    end
-    
-    Q --> Queue
-    
-    subgraph Agents [Agents Execute Independently - Multiple Workers]
+    subgraph Agents [Agents Execute Independently - Any Language/Platform]
         direction TB
-        AG1[Agent Workers<br/>Process jobs<br/>Read/write to DB<br/>Mark job complete]
+        AG2[Agent Accepts Job<br/>Returns status: accepted]
+        AG3[Agent Executes Work<br/>Asynchronously]
+        AG4[Agent Updates DB<br/>AgentJobExecution table]
+        AG5[Agent Writes Results<br/>to Database]
     end
     
-    Queue --> AG1
+    AG1 --> AG2
+    AG2 --> AG3
+    AG3 --> AG4
+    AG4 --> AG5
     
-    AG1 --> DB5[(Database<br/>All agents read/write<br/>independently)]
+    AG5 --> DB5[(Database<br/>All agents read/write<br/>independently)]
     
-    DB5 --> S18[Scheduler queries DB<br/>for job status]
+    DB5 --> S18[Scheduler queries DB<br/>AgentJobExecution table<br/>for job status]
     S18 --> S19[Update ScheduleExecution<br/>Table]
     S19 --> R[Return orchestration results]
 "
