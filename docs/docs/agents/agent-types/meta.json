@@ -5,7 +5,7 @@
     "agent-scheduler",
     "agent-query-strategy",
     "agent-data-collection",
-    "agent-analysis",
+    "analysis-agent",
     "agent-content-generation",
     "agent-quality-assurance",
     "agent-delivery",
