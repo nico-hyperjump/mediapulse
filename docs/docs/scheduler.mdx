@@ -4,73 +4,32 @@ title: Scheduler/Orchestrator
 
 ## Purpose
 
-**The Scheduler/Orchestrator is NOT an agent** - it is a core system component that orchestrates and schedules all agents in the system by managing periodic tasks, pipeline workflows, and job dependencies. The orchestrator is **completely generic** and **database-driven**—it has no hardcoded agent configurations. Admins create schedules, job templates, and pipelines through the admin interface, and the orchestrator dynamically discovers agents and executes jobs based on database configurations.
+**The Scheduler/Orchestrator is NOT an agent** - it is a long-running BullMQ worker that monitors the database for schedules and executes them automatically. The orchestrator is **completely generic** and **database-driven**—it has no hardcoded agent configurations. Admins create schedules and pipelines through the admin interface, and the orchestrator dynamically discovers agents and executes jobs based on database configurations.
 
-The orchestrator invokes agents via HTTP endpoints based on schedules stored in the database (cron, interval, or on-demand). Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The orchestrator does not wait for agent completion but tracks job status through the database.
+The scheduler runs continuously as a BullMQ worker, polling the database for schedules that need to be executed (once or repeating with cron/interval). When a schedule's time arrives, the orchestrator invokes agents via HTTP endpoints. Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The orchestrator does not wait for agent completion but tracks job status through the database.
 
-**Note**: The orchestrator interacts with the [Agent Registry API](./agent-registry-api) to discover available agent instances, monitor their health, and track capacity. The Agent Registry API is a separate service that agents use to register themselves and report their status. See [Agent Registry API Documentation](./agent-registry-api) for details.
+**Note**: Agents are one-off executions. When a schedule triggers, the scheduler invokes the agent's HTTP endpoint. The agent runs, completes its job, writes results to the database, and then shuts down. There are no long-running agent instances to manage.
 
 **Key Responsibilities**:
 - Dynamically discover agents from the database (no hardcoded agent list)
-- **Automatically spawn and manage agent instances** based on demand and load
-- **Scale instances up/down automatically** (create new instances when needed, terminate idle ones)
-- **Monitor job queue** and spawn instances proactively when queue grows
-- Distribute jobs across available instances using load balancing
 - Execute schedules created by admins (stored in `Schedule` table)
-- Expand job templates with parameter expansion (e.g., one schedule → many jobs for many tickers)
-- Divide large jobs into smaller sub-jobs when needed (e.g., 100 keywords → 10 jobs of 10 keywords)
+- **Support ID expansion** for agents that accept ID parameters (e.g., `tickerId`, `userId`)
+  - When `value: 'all'` is set, query database table and create multiple job inputs
+  - Process jobs in batches with stagger delay to avoid overloading agents
 - Orchestrate multi-agent pipelines with job dependencies (stored in `Pipeline` table)
-- Manage different schedule types: cron expressions, intervals, and on-demand triggers
+- Manage different schedule types: once or repeating (cron/interval)
+- Poll database continuously for schedules that need execution
 - Invoke agent HTTP endpoints with proper parameters and authentication
-- Select appropriate agent instances based on capacity and load
 - Monitor job status through database queries (`AgentJobExecution` table)
-- Monitor instance health and automatically replace failed instances
 - Handle retries for failed jobs by re-invoking agent endpoints
-- Support manual triggers via API or admin interface
 - Validate agent responses and handle agent failures gracefully
-
-## Inputs
-
-```typescript
-interface SchedulerInput {
-  // For scheduled tasks (from database)
-  scheduleId?: string; // ID of schedule from Schedule table
-  
-  // For manual/on-demand triggers
-  trigger?: {
-    type: 'manual' | 'event-driven',
-    jobTemplateId?: string; // Reference to JobTemplate in database
-    agentId?: string; // Agent ID (must exist in AgentRegistry)
-    params?: Record<string, any>; // Parameters to pass to job (merged with template params)
-    expansionParams?: {
-      // Parameter expansion configuration
-      expandTickers?: {
-        scope: 'all' | 'active' | string[]; // Which tickers to expand
-        batchSize?: number;
-        staggerDelay?: number;
-      };
-      expandUsers?: {
-        userIds?: string[]; // Specific users, or all if empty
-        tickerIds?: string[]; // Filter by ticker subscriptions
-      };
-    };
-  },
-  
-  // For pipeline execution
-  pipelineId?: string; // ID of pipeline from Pipeline table
-  pipelineParams?: Record<string, any>; // Parameters for pipeline execution
-}
-```
 
 ## Database Schema
 
 The scheduler uses the following database tables (stored in PostgreSQL):
 
 ### `AgentRegistry`
-Stores **agent type metadata** (not version-specific). Agents register themselves via the [Agent Registry API](./agent-registry-api). See [Agent Registry API Documentation](./agent-registry-api#agentregistry) for the complete schema definition and [Agent Specification](./agent-specification) for full registration details.
-
-### `AgentInstance`
-Stores running agent instances managed by the orchestrator. The orchestrator automatically creates, manages, and terminates instances. Multiple instances of the same agent version can exist for horizontal scaling. Instances register themselves and report status via the [Agent Registry API](./agent-registry-api). See [Agent Registry API Documentation](./agent-registry-api#agentinstance) for the complete schema definition and [Agent Specification](./agent-specification) for instance lifecycle details.
+Stores **agent type metadata** (not version-specific), including agent HTTP endpoint URLs and configuration. The scheduler uses this to know how to invoke each agent type. See [Agent Registry API Documentation](./agent-registry-api#agentregistry) for the complete schema definition and [Agent Specification](./agent-specification) for full registration details.
 
 ### `AgentVersionDeployment`
 Determines which version is active in production for each agent type. **Only one version per agentId can have `environment: 'production'`**.
@@ -86,58 +45,60 @@ Determines which version is active in production for each agent type. **Only one
 ```
 
 ### `Schedule`
-Stores all schedules created by admins. No hardcoded schedules.
+Stores all schedules created by admins. No hardcoded schedules. A schedule can run a single agent or a pipeline of agents, once or repeatedly.
 
 ```typescript
 {
   id: string;
   name: string;
   description?: string;
-  type: 'cron' | 'interval' | 'on-demand';
-  cronExpression?: string; // For cron type
-  interval?: number; // For interval type (milliseconds)
+  
+  // Schedule timing
+  repeat: 'once' | 'repeating'; // 'once' for one-time execution, 'repeating' for recurring
+  cronExpression?: string; // For repeating schedules (e.g., '0 2 * * 0' for weekly)
+  interval?: number; // For repeating schedules (milliseconds, e.g., 3600000 for hourly)
   timezone?: string; // Default: 'America/New_York'
-  enabled: boolean;
-  jobTemplateId: string; // References JobTemplate
-  expansionConfig?: {
-    // How to expand parameters when creating jobs
-    expandTickers?: {
-      scope: 'all' | 'active' | string[]; // Which tickers to expand
-      batchSize?: number; // Number of tickers per batch
-      staggerDelay?: number; // Delay between batches (ms)
-    };
-    expandUsers?: {
-      userIds?: string[]; // Specific users, or all if empty
-      tickerIds?: string[]; // Filter by ticker subscriptions
+  startAt?: Date; // Optional: when to start the schedule (for 'once' or first run of 'repeating')
+  
+  // What to execute
+  targetType: 'agent' | 'pipeline';
+  agentId?: string; // If targetType is 'agent', references AgentRegistry
+  pipelineId?: string; // If targetType is 'pipeline', references Pipeline
+  
+  // Agent parameters (merged with any ID expansions)
+  params?: Record<string, any>; // Parameters to pass to agent(s)
+  
+  // ID expansion configuration (for agents that accept IDs like tickerId, userId, etc.)
+  // When an ID parameter is set to 'all', the scheduler will fetch all IDs from the table
+  // and create multiple job inputs, running them in batches with stagger delay
+  idExpansions?: {
+    // Map of parameter name to expansion config
+    // Example: { tickerId: { table: 'Ticker', value: 'all' | string } }
+    [paramName: string]: {
+      table: string; // Database table name (e.g., 'Ticker', 'User')
+      value: 'all' | string; // 'all' to expand to all IDs, or specific ID string
+      batchSize?: number; // Number of IDs per batch (default: 10)
+      staggerDelay?: number; // Delay between batches in milliseconds (default: 1000)
     };
   };
-  priority?: number; // Job priority (default: 0)
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string; // Admin user ID
-}
-```
-
-### `JobTemplate`
-Defines reusable job templates that can be used by schedules or triggered manually.
-
-```typescript
-{
-  id: string;
-  name: string;
-  description?: string;
-  agentId: string; // References AgentRegistry
-  defaultParams: object; // Default parameters (JSON)
-  requiredParams?: string[]; // Parameter names that must be provided
-  expansionParams?: string[]; // Parameter names that can be expanded (e.g., ['ticker', 'userId'])
+  
+  // Retry configuration
   retryConfig?: {
     maxRetries: number;
     backoff: 'exponential' | 'linear' | 'fixed';
     delay: number;
   };
+  
+  // Timeout
   timeout?: number; // Job timeout in milliseconds
-  priority?: number; // Default job priority
+  
+  // Priority
+  priority?: number; // Job priority (default: 0)
+  
+  // Status
   enabled: boolean;
+  
+  // Metadata
   createdAt: Date;
   updatedAt: Date;
   createdBy: string; // Admin user ID
@@ -145,7 +106,7 @@ Defines reusable job templates that can be used by schedules or triggered manual
 ```
 
 ### `Pipeline`
-Defines multi-agent workflows with dependencies.
+Defines multi-agent workflows with dependencies. Pipelines can be scheduled just like agents.
 
 ```typescript
 {
@@ -154,14 +115,10 @@ Defines multi-agent workflows with dependencies.
   description?: string;
   steps: Array<{
     stepId: string; // Unique ID within pipeline
-    jobTemplateId: string; // References JobTemplate
+    agentId: string; // References AgentRegistry
     dependsOn?: string[]; // Step IDs this step depends on
     parallel: boolean; // Can run in parallel with other steps
-    condition?: {
-      // Optional condition for step execution
-      type: 'data-freshness' | 'custom';
-      config: object;
-    };
+    params?: Record<string, any>; // Step-specific parameters
     retryConfig?: {
       maxRetries: number;
       backoff: 'exponential' | 'linear' | 'fixed';
@@ -169,18 +126,6 @@ Defines multi-agent workflows with dependencies.
     };
     timeout?: number;
   }>;
-  expansionConfig?: {
-    // How to expand parameters for pipeline execution
-    expandTickers?: {
-      scope: 'all' | 'active' | string[];
-      batchSize?: number;
-      staggerDelay?: number;
-    };
-    expandUsers?: {
-      userIds?: string[];
-      tickerIds?: string[];
-    };
-  };
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -220,45 +165,6 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
     checkInterval: 60000 // How often to check for due schedules (ms)
   },
   
-  // Instance management settings
-  instanceManagement: {
-    enabled: true,
-    autoScaling: {
-      enabled: true,
-      minInstances: {
-        [agentId: string]: number // Min instances per agent type (default: 1)
-      },
-      maxInstances: {
-        [agentId: string]: number // Max instances per agent type (default: 10)
-      },
-      scaleUpThreshold: 0.8, // Spawn new instance when average load > 80%
-      scaleDownThreshold: 0.2, // Terminate instance when average load < 20%
-      scaleUpCooldown: 300000, // Wait 5 minutes before scaling up again
-      scaleDownCooldown: 600000, // Wait 10 minutes before scaling down again
-      idleTimeout: 1800000, // Terminate idle instances after 30 minutes
-      queueBasedScaling: {
-        enabled: true,
-        pendingJobsThreshold: 10, // Spawn instance if pending jobs > threshold
-        jobsPerInstance: 5 // Target jobs per instance
-      }
-    },
-    instanceConfig: {
-      defaultCapacity: 10, // Default max concurrent jobs per instance
-      healthCheckInterval: 30000, // Check instance health every 30 seconds
-      heartbeatTimeout: 120000, // Consider instance dead if no heartbeat for 2 minutes
-      spawnTimeout: 60000, // Timeout for spawning new instance (60 seconds)
-    },
-    deployment: {
-      type: 'container' | 'lambda' | 'cloud-run' | 'kubernetes', // How to spawn instances
-      config: {
-        // Deployment-specific configuration
-        // For containers: image, resources, etc.
-        // For Lambda: function config, etc.
-        // For Kubernetes: deployment spec, etc.
-      }
-    }
-  },
-  
   // HTTP client configuration for agent invocations
   httpClient: {
     timeout: 300000, // Default timeout (ms) - can be overridden per agent
@@ -273,12 +179,10 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
     }
   },
   
-  // Default expansion settings (can be overridden per schedule)
-  defaultExpansion: {
-    tickerBatchSize: 10,
-    tickerStaggerDelay: 1000,
-    userBatchSize: 20,
-    userStaggerDelay: 500
+  // Default ID expansion settings (can be overridden per schedule)
+  defaultIdExpansion: {
+    batchSize: 10, // Default batch size for ID expansions
+    staggerDelay: 1000 // Default delay between batches (ms)
   },
   
   // Monitoring and notifications
@@ -290,255 +194,153 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
 }
 ```
 
-**Note**: All agent-specific schedules, job templates, and pipelines are stored in the database tables above, not in the orchestrator configuration. The orchestrator dynamically loads and executes them.
+**Note**: All agent-specific schedules and pipelines are stored in the database tables above, not in the orchestrator configuration. The orchestrator dynamically loads and executes them.
 
-## Outputs
+## Execution Results
 
-```typescript
-{
-  agentId: 'orchestrator', // Note: Orchestrator is not an agent, but uses this format for consistency
-  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
-  executionId: string,
-  timestamp: Date,
-  executionTime: number,
-  triggerType: 'cron' | 'interval' | 'manual' | 'event-driven',
-  schedulesExecuted?: Array<{
-    scheduleId: string,
-    scheduleName: string,
-    jobTemplateId: string,
-    jobTemplateName: string,
-    agentId: string,
-    jobsCreated: number,
-    parametersExpanded?: {
-      tickers?: number, // Number of tickers expanded
-      users?: number, // Number of users expanded
-      totalCombinations?: number // Total expanded parameter sets
-    },
-    batchesProcessed?: number, // For batched processing
-    status: 'success' | 'partial' | 'failed'
-  }>,
-  jobsEnqueued: Array<{
-    jobId: string,
-    agentId: string,
-    jobTemplateId?: string, // If created from template
-    scheduleId?: string, // If part of a scheduled task
-    pipelineId?: string, // If part of a pipeline
-    pipelineStepId?: string, // If part of a pipeline step
-    status: 'pending' | 'running' | 'completed' | 'failed',
-    priority: number,
-    enqueuedAt: Date,
-    dependencies?: string[], // Job IDs this job depends on
-    params?: Record<string, any> // Agent-specific parameters (merged from template + trigger)
-  }>,
-  pipelinesExecuted?: Array<{
-    pipelineId: string,
-    pipelineName: string,
-    status: 'initiated' | 'in-progress' | 'completed' | 'partial',
-    parametersExpanded?: {
-      tickers?: number,
-      users?: number,
-      totalCombinations?: number
-    },
-    stepsExecuted: Array<{
-      stepId: string,
-      jobTemplateId: string,
-      jobsCreated: number,
-      status: 'pending' | 'running' | 'completed' | 'failed'
-    }>,
-    conditionalSteps?: {
-      dataFreshnessChecks?: number,
-      dataCollectionJobsTriggered?: number,
-      freshDataCount?: number,
-      staleDataCount?: number
-    },
-    metadata: {
-      totalJobsCreated: number,
-      totalSteps: number,
-      completedSteps: number
-    }
-  }>,
-  errors?: Array<{
-    scheduleId?: string,
-    jobTemplateId?: string,
-    pipelineId?: string,
-    agentId?: string,
-    error: string,
-    timestamp: Date
-  }>
-}
-```
+As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it writes execution results to the database. The following information is tracked:
 
-**Note**: The orchestrator returns orchestration results immediately after invoking agent instance endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agent instances update their job status in the database as they execute independently.
+**ScheduleExecution Table** - Records each schedule execution:
+- `scheduleId`: Reference to the executed schedule
+- `executionTime`: When the schedule was executed
+- `status`: 'success' | 'partial' | 'failed'
+- `jobsCreated`: Number of jobs created from this execution
+- `jobsEnqueued`: Number of jobs successfully enqueued
+- `errors`: Array of any errors encountered
+- `metadata`: Additional execution metadata including:
+  - ID expansion details (total IDs, batches processed, batch size)
+  - Pipeline execution details (if pipeline was executed)
+
+**AgentJobExecution Table** - Records each individual agent job:
+- `jobId`: Unique job identifier
+- `agentId`: Agent that will execute the job
+- `scheduleId`: Schedule that triggered this job (if applicable)
+- `pipelineId`: Pipeline this job is part of (if applicable)
+- `pipelineStepId`: Pipeline step this job is part of (if applicable)
+- `status`: 'pending' | 'running' | 'completed' | 'failed'
+- `priority`: Job priority
+- `enqueuedAt`: When the job was enqueued
+- `dependencies`: Job IDs this job depends on
+- `params`: Agent-specific parameters (merged from schedule + expanded IDs)
+
+**Note**: The scheduler writes execution records to the database immediately after invoking agent HTTP endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agents update their job status in the database as they execute.
 
 ## Process
 
-1. **Initialize**: 
+1. **Initialize (BullMQ Worker Startup)**: 
+   - Start as a long-running BullMQ worker process
    - Load orchestrator config from database (`AgentConfig` table, key: `scheduler`)
    - Load all enabled schedules from `Schedule` table
-   - Load all enabled job templates from `JobTemplate` table
    - Load all enabled pipelines from `Pipeline` table
    - Load agent registry from `AgentRegistry` table (discover available agents)
    - Validate agent endpoints are accessible (health checks)
-   - Initialize cron scheduler for all cron-based schedules
-   - Initialize interval timers for all interval-based schedules
+   - Initialize BullMQ queues for schedule execution
+   - Register BullMQ workers for processing schedules
    - Initialize job dependency tracking (for pipelines)
-   - Initialize ticker/identifier cache (optional, for performance when processing many tickers)
+   - Initialize ID cache (optional, for performance when processing many IDs)
    - Initialize HTTP client pool for agent invocations
+   - Start polling loop to check for schedules that need execution
 
-2. **Agent Discovery & Instance Management**:
+2. **Agent Discovery**:
 
    - Query `AgentRegistry` table for all enabled agents (agent type metadata)
    - Query `AgentVersionDeployment` table to determine active production version for each agent
-   - **Interact with Agent Registry API**:
-     - Query Agent Registry API to discover available agent instances (or query `AgentInstance` table directly)
-     - Monitor instance health and availability through Agent Registry API
-     - Track instance capacity and current load for load balancing
-   - **Initialize Instance Management**:
-     - For each agent type, ensure minimum number of instances are running (from `minInstances` config)
-     - Spawn initial instances if needed
-     - Start instance health monitoring loop
-   - **Monitor Job Queue & Load**:
-     - Continuously monitor pending jobs in `AgentJobExecution` table
-     - Track average load across all instances per agent type
-     - Spawn new instances when:
-       - Average load exceeds `scaleUpThreshold`
-       - Pending jobs exceed `pendingJobsThreshold`
-       - No available instances with capacity
-     - Terminate idle instances when:
-       - Average load below `scaleDownThreshold` for `scaleDownCooldown` period
-       - Instance has been idle for `idleTimeout`
-       - Must maintain at least `minInstances` per agent type
-   - Query `AgentInstance` table for all active instances of each agent version (via Agent Registry API or direct database query)
-   - Validate that agents referenced in schedules, job templates, and pipelines exist in registry
-   - Verify agent instance endpoints are accessible (health checks)
+   - Validate that agents referenced in schedules and pipelines exist in registry
+   - Load agent HTTP endpoint URLs and configuration from `AgentRegistry`
    - Load agent input schemas to validate job parameters
    - Cache agent metadata (endpoints, authentication, timeouts) for performance
-   - Monitor instance heartbeats and automatically replace instances if heartbeat is stale
-   - Track instance capacity and current load for load balancing
 
-3. **Schedule Execution** (triggered by cron, interval, manual, or event):
+3. **Schedule Polling & Execution**:
 
-   The orchestrator handles different types of schedules from the database:
+   - Worker picks up schedule from queue
+   - Load schedule configuration from database
+   - Execute schedule (see section 4)
+   - For one-time schedules: After execution, mark schedule as disabled or delete it (configurable)
+   - For repeating schedules: Schedule next execution based on cron/interval
 
-   **3a. Cron-based Schedules**:
-   - Monitor all cron expressions from `Schedule` table where `type = 'cron'` and `enabled = true`
-   - When cron expression matches current time, execute the corresponding schedule
-   - Load the associated `JobTemplate` from the schedule's `jobTemplateId`
-   - Execute job creation with parameter expansion (see section 4)
+4. **ID Expansion** (for agents that accept ID parameters):
 
-   **3b. Interval-based Schedules**:
-   - Monitor interval timers for schedules where `type = 'interval'` and `enabled = true`
-   - When interval elapses, execute the corresponding schedule
-   - Load the associated `JobTemplate` and execute job creation
+   The orchestrator expands ID parameters based on `idExpansions` in schedules:
 
-   **3c. On-demand Triggers**:
-   - Handle manual triggers via API or admin interface
-   - Handle event-driven triggers (e.g., entity graph updated → trigger query generation)
-   - Execute immediately when triggered
-   - Can reference a `JobTemplate` directly or provide ad-hoc parameters
+   **4a. ID Expansion Process**:
+   - For each parameter in `idExpansions`:
+     - If `value = 'all'`:
+       - Query the specified table from database (e.g., `Ticker`, `User`)
+       - Filter by enabled/active status if applicable
+       - Get all IDs from the table
+     - If `value` is a specific ID string:
+       - Use that single ID
+   - If multiple IDs are found (from 'all' expansion):
+     - Group IDs into batches based on `batchSize` (default: 10)
+     - Create multiple job inputs, one per ID
+     - Apply stagger delays between batches based on `staggerDelay` (default: 1000ms) to avoid overloading agents
+   - If single ID or no expansion:
+     - Create single job input
 
-4. **Parameter Expansion** (for agents that require expansion):
+   **4b. Example: Ticker Expansion**:
+   - Schedule has `idExpansions: { tickerId: { table: 'Ticker', value: 'all', batchSize: 10, staggerDelay: 1000 } }`
+   - Scheduler queries `Ticker` table and finds 100 enabled tickers
+   - Creates 100 job inputs (one per ticker)
+   - Processes in batches of 10 with 1 second delay between batches
+   - Each job gets `params: { tickerId: '<specific-ticker-id>', ...otherParams }`
 
-   The orchestrator expands parameters based on `expansionConfig` in schedules or `expansionParams` in triggers:
+   **4c. Example: Specific ID**:
+   - Schedule has `idExpansions: { tickerId: { table: 'Ticker', value: 'AAPL' } }`
+   - Creates single job input with `params: { tickerId: 'AAPL', ...otherParams }`
 
-   **4a. Ticker Expansion**:
-   - If `expandTickers` is configured:
-     - Load tickers/identifiers from database based on `scope`:
-       - `'all'`: All tickers in the `Ticker` table where `enabled = true`
-       - `'active'`: Only tickers with active user subscriptions (from `UserTicker` table)
-       - `string[]`: Specific ticker identifiers provided in configuration
-     - Filter by enabled/active status
-     - Group tickers into batches based on `batchSize` configuration
-     - Apply stagger delays between batches to avoid rate limits
-   - For each ticker, create a separate job with `ticker` parameter set
+5. **Job Creation**:
 
-   **4b. User Expansion**:
-   - If `expandUsers` is configured:
-     - Load users from database based on filters:
-       - If `userIds` provided: Only those specific users
-       - If `tickerIds` provided: Users subscribed to those tickers
-       - Otherwise: All active users
-     - Group users into batches if needed
-   - For each user, create a separate job with `userId` parameter set
+   For each schedule execution:
 
-   **4c. Combined Expansion** (e.g., user-ticker pairs):
-   - Expand both users and tickers
-   - Create jobs for each user-ticker combination
-   - Example: 10 users × 5 tickers = 50 jobs
+   **5a. Load Schedule Configuration**:
+   - Load schedule from `Schedule` table
+   - Determine target: `agentId` (single agent) or `pipelineId` (pipeline of agents)
+   - Validate that target exists in `AgentRegistry` or `Pipeline` table
 
-5. **Job Creation** (from JobTemplate):
+   **5b. ID Expansion**:
+   - Check if `idExpansions` is configured
+   - For each parameter in `idExpansions`, expand IDs (see section 4)
+   - If multiple IDs found, create multiple job inputs (one per ID)
+   - Merge expanded IDs with base `params` from schedule
 
-   For each schedule execution or manual trigger:
-
-   **5a. Load JobTemplate**:
-   - Load the `JobTemplate` referenced by the schedule or trigger
-   - Validate that the template's `agentId` exists in `AgentRegistry`
-   - Merge default parameters from template with trigger parameters
-
-   **5b. Parameter Expansion**:
-   - Check if any parameters in `expansionParams` need expansion
-   - If ticker expansion needed: Expand to multiple tickers (see 4a)
-   - If user expansion needed: Expand to multiple users (see 4b)
-   - If both: Expand to user-ticker combinations (see 4c)
-
-   **5c. Job Division** (if needed):
-   - Check if job parameters indicate a large job that should be divided (e.g., 100 keywords)
-   - If job division is configured for the agent:
-     - Divide large parameter sets into smaller sub-jobs (e.g., 100 keywords → 10 jobs of 10 keywords)
-     - Create separate execution records for each sub-job
-     - Link sub-jobs to parent job via `metadata.parentJobId`
-     - Each sub-job gets its own `jobId` and `executionId`
+   **5c. Batch Processing**:
+   - If multiple job inputs created (from ID expansion):
+     - Group job inputs into batches based on `batchSize` from expansion config
+     - Process batches sequentially with `staggerDelay` between batches
+     - Within each batch, process jobs in parallel (up to batch size)
+   - If single job input:
+     - Process immediately
    
-   **5d. Instance Selection & Job Distribution**:
-   - For each job (or sub-job):
-     - **Check Available Capacity**:
-       - Query `AgentInstance` table for active instances of the agent's production version
-       - Filter instances by:
-         - `status: 'active'`
-         - Recent `lastHeartbeat` (e.g., within last 2 minutes)
-         - Available capacity (`currentLoad < capacity`)
-       - Calculate total available capacity across all instances
-     - **Auto-Scale if Needed**:
-       - If no instances available or total capacity insufficient:
-         - Check if can spawn new instance (within `maxInstances` limit)
-         - Spawn new instance if allowed
-         - Wait for instance to become ready (status: 'active')
-       - If pending jobs exceed threshold and average load is high:
-         - Spawn additional instances (respecting `maxInstances` and cooldown)
-     - **Select Instance**:
-       - Select instance using load balancing algorithm:
-         - **Least-loaded**: Instance with lowest `currentLoad / capacity` ratio
-         - **Round-robin**: Rotate through available instances
-         - **Random**: Randomly select from available instances
-     - **Distribute Job**:
-       - Update selected instance's `currentLoad` (increment by 1)
-       - Generate unique `jobId` and `executionId`
-       - Create execution record in `AgentJobExecution` table with `status: 'pending'`
-       - Build execution request with merged parameters (template defaults + trigger params + expanded params)
-       - Validate parameters against agent's `inputSchema`
-       - Invoke agent instance HTTP endpoint (POST to `AgentInstance.endpoint.url`)
-         - Include authentication headers if configured
-         - Set timeout from agent endpoint config or template
-         - Include `X-Job-Id` and `X-Execution-Id` headers
-         - Include `instanceId` in request body for load tracking
-       - Handle agent response:
-         - If `status: 'accepted'`: Job is queued for execution by agent instance
-         - If `status: 'rejected'`: Mark execution as failed, decrement instance load, log error
-     - Apply stagger delays between batches (if configured)
+   **5d. Job Distribution**:
+   - For each job input:
+     - Generate unique `jobId` and `executionId`
+     - Create execution record in `AgentJobExecution` table with `status: 'pending'`
+     - Build execution request with merged parameters (schedule params + expanded IDs)
+     - Validate parameters against agent's `inputSchema`
+     - Get agent HTTP endpoint URL from `AgentRegistry` table
+     - Invoke agent HTTP endpoint (POST to agent endpoint URL)
+       - Include authentication headers if configured
+       - Set timeout from schedule config or agent default
+       - Include `X-Job-Id` and `X-Execution-Id` headers
+     - Handle agent response:
+       - Agent accepts the job and starts execution
+       - Agent updates `AgentJobExecution` table as it runs
+       - If agent fails to start: Mark execution as failed, log error
+     - Apply stagger delays between batches (if configured for ID expansion)
    - Track job creation in `ScheduleExecution` table
 
 6. **Pipeline Orchestration**:
 
-   For pipeline execution (from `Pipeline` table):
+   For pipeline execution (from `Pipeline` table or schedule with `targetType: 'pipeline'`):
 
    **6a. Load Pipeline**:
    - Load pipeline definition from `Pipeline` table
-   - Validate all referenced `JobTemplate` IDs exist
-   - Validate all referenced agents exist in `AgentRegistry`
+   - Validate all referenced `agentId` values exist in `AgentRegistry`
 
-   **6b. Parameter Expansion** (if configured):
-   - Apply `expansionConfig` from pipeline (same as schedule expansion)
-   - Expand tickers, users, or both as needed
+   **6b. ID Expansion** (if configured in schedule):
+   - Apply `idExpansions` from schedule (same as single agent expansion)
+   - Expand IDs for each parameter that needs expansion
+   - If multiple IDs found, create multiple pipeline execution contexts (one per ID)
 
    **6c. Build Dependency Graph**:
    - Parse pipeline `steps` to build dependency graph
@@ -546,35 +348,26 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
    - Identify steps that must run sequentially (via `dependsOn`)
 
    **6d. Execute Pipeline Steps**:
-   - For each expanded parameter set (e.g., each user-ticker pair):
+   - For each expanded parameter set (if any):
      - Create execution records for all pipeline steps in `AgentJobExecution` table
      - Build dependency graph based on `dependsOn` relationships
      - For steps without dependencies: Invoke agent endpoints immediately
      - For steps with dependencies: Wait for dependency jobs to complete (check `AgentJobExecution.status`)
-     - Handle conditional steps (e.g., data freshness checks)
+     - Merge step-specific `params` with expanded IDs and schedule params
      - Invoke agent endpoints with proper sequencing
    - Track pipeline execution in database
 
-   **6e. Conditional Steps**:
-   - If step has `condition.type = 'data-freshness'`:
-     - Check timestamp of latest collected data in database
-     - If data is stale, invoke Data Collection agent endpoint with high priority first
-     - Wait for Data Collection job to complete (poll `AgentJobExecution.status`)
-     - Then invoke the dependent pipeline step
-   - Custom conditions can be implemented via plugins
-
 7. **Agent Execution**:
 
-   - Orchestrator invokes agent instance HTTP endpoints asynchronously
-   - Agent instances accept jobs immediately and return `status: 'accepted'`
-   - Agent instances execute work asynchronously and update `AgentJobExecution` table
-   - Agent instances update their `currentLoad` when jobs start/complete
-   - Agents do not receive data from other agents
-   - Agents read from and write to database independently
+   - Orchestrator invokes agent HTTP endpoints asynchronously
+   - Agent accepts the job and starts execution
+   - Agent executes work and updates `AgentJobExecution` table with status updates
+   - Agent reads from and writes to database independently
    - No direct agent-to-agent communication
    - All coordination through database state
+   - When agent completes, it updates `AgentJobExecution.status` to 'completed' or 'failed'
+   - Agent shuts down after completing its job
    - Orchestrator monitors agent execution by querying `AgentJobExecution` table
-   - Orchestrator monitors instance health by querying `AgentInstance` table
 
 8. **Job Dependencies & Status Tracking**:
 
@@ -584,196 +377,197 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
    - Handle failed jobs with retry logic:
      - Check `AgentJobExecution.error.retryable` flag
      - If retryable and retry count < max: 
-       - Select a different instance (if original instance is unhealthy) or same instance
-       - Re-invoke agent instance endpoint after backoff delay
-       - Update instance load accordingly
-     - If not retryable: Mark as permanently failed, decrement instance load, notify admins
-   - When jobs complete: Decrement instance `currentLoad` in `AgentInstance` table
-   - Use exponential backoff from template/schedule config for retries
+       - Re-invoke agent HTTP endpoint after backoff delay (from schedule `retryConfig`)
+     - If not retryable: Mark as permanently failed, notify admins
+   - Use exponential backoff from schedule config for retries
 
-9. **Parallelization & Job Division**:
+9. **Batch Processing & Parallelization**:
 
-   - **Expanded Parameter Jobs** (e.g., per-ticker, per-user):
-     - Multiple expanded items processed in parallel (controlled by `batchSize` in expansion config)
-     - Orchestrator invokes multiple agent instance endpoints concurrently (up to `batchSize`)
-     - Example: 100 tickers with `batchSize: 20` = 5 batches, each batch invokes 20 agent instance endpoints in parallel
-     - Stagger delays between batches prevent rate limiting and resource exhaustion
-     - Agent instances execute work asynchronously after accepting jobs
+   - **ID Expansion with Batching**:
+     - When `idExpansions` creates multiple job inputs (e.g., 100 tickers):
+       - Jobs are grouped into batches based on `batchSize` (default: 10)
+       - Within each batch, jobs are processed in parallel (up to batch size)
+       - Between batches, `staggerDelay` is applied (default: 1000ms) to avoid overloading agents
+       - Example: 100 tickers with `batchSize: 10` = 10 batches, each batch processes 10 jobs in parallel with 1 second delay between batches
+     - Agents execute work asynchronously after accepting jobs
    
-   - **Job Division** (for large parameter sets):
-     - When a job has a large parameter set (e.g., 100 keywords), the orchestrator can divide it into smaller sub-jobs
-     - Example: Job with 100 keywords → 10 sub-jobs of 10 keywords each
-     - Each sub-job is distributed to an available agent instance
-     - Sub-jobs can run in parallel across multiple instances
-     - Parent job relationship is tracked via `metadata.parentJobId`
-     - Results from sub-jobs can be aggregated if needed
-   
-   - **Single Parameter Jobs** (no expansion):
-     - Single job processes all data in aggregate
+   - **Single ID Jobs** (no expansion or specific ID):
+     - Single job processes with one ID parameter
      - Can run concurrently with other agent jobs
-     - Distributed to an available instance based on load balancing
+     - Invoked via HTTP endpoint when needed
    
    - **Pipeline Steps**:
      - Steps with `parallel: true` can run concurrently
      - Steps with `dependsOn` run sequentially after dependencies complete
-     - Multiple parameter expansions (e.g., user-ticker pairs) can be processed in parallel
-     - Example: Newsletter pipeline with 10 users × 5 tickers = 50 parallel pipeline executions
-     - Each execution distributed across available agent instances
+     - If ID expansion creates multiple contexts (e.g., 100 tickers), each context runs the pipeline independently
+     - Example: Pipeline with 100 ticker expansions = 100 parallel pipeline executions
+     - Each execution invokes agent HTTP endpoints as needed
 
 10. **Scalability Considerations**:
 
-   - **Large Parameter Sets**: When processing hundreds of tickers/users:
+   - **Large ID Sets**: When processing hundreds of IDs (e.g., all tickers):
      - Batch processing prevents overwhelming agent endpoints
      - Stagger delays prevent API rate limits and agent overload
      - Multiple agent invocations happen concurrently (up to `batchSize`)
-     - Failed jobs for one parameter set don't block others
+     - Failed jobs for one ID don't block others
      - Partial failures are handled gracefully (continue with remaining items)
      - Agents can scale independently to handle their own load
    
    - **Dynamic Management**:
-     - New tickers/users are automatically included in next scheduled run (if scope includes them)
-     - Disabled tickers/users are excluded from processing
-     - Priority can be set per schedule/template to influence job priority
+     - New IDs are automatically included in next scheduled run when `value: 'all'` is used
+     - Disabled/removed IDs are excluded from processing
+     - Priority can be set per schedule to influence job priority
    
    - **Resource Management**:
-     - `batchSize` in expansion config controls concurrent job execution
+     - `batchSize` in `idExpansions` controls concurrent job execution per batch
+     - `staggerDelay` controls rate of batch processing
      - Queue concurrency settings limit total parallel workers
      - Memory and CPU usage scales with batch size and concurrency
 
 11. **Error Handling**:
 
-   - **Agent Instance Invocation Errors** (network, timeout, instance unavailable):
-     - Retry with exponential backoff (configured in `JobTemplate` or `Schedule`)
-     - Mark instance as `'unhealthy'` if health check fails or multiple failures occur
-     - Select alternative instance if original instance is unavailable
+   - **Agent Invocation Errors** (network, timeout, agent unavailable):
+     - Retry with exponential backoff (configured in schedule `retryConfig`)
      - Log errors to database for monitoring (`ScheduleExecution` table)
-     - Decrement instance load on failure
+     - If agent endpoint is unreachable: Mark execution as failed, log error
    
-   - **Agent Execution Errors** (agent rejects job or fails during execution):
-     - Agent instance updates `AgentJobExecution.status: 'failed'` with error details
+   - **Agent Execution Errors** (agent fails during execution):
+     - Agent updates `AgentJobExecution.status: 'failed'` with error details
      - Orchestrator checks `error.retryable` flag
-     - If retryable: Re-invoke agent instance endpoint (same or different instance) after backoff delay
-     - If not retryable: Mark as permanently failed, decrement instance load, notify admins
-   
-   - **Instance Failures**:
-     - Instances with stale heartbeats are automatically excluded from job distribution
-     - Jobs in progress on failed instances are retried on other instances
-     - Instance health is monitored continuously
+     - If retryable: Re-invoke agent HTTP endpoint after backoff delay (from schedule `retryConfig`)
+     - If not retryable: Mark as permanently failed, notify admins
    
    - **Pipeline Dependencies**:
      - Job dependencies can timeout if upstream jobs fail repeatedly
      - Pipeline continues with partial results if some jobs fail (non-blocking)
+     - Each pipeline step can have its own retry configuration
    
    - **General**:
      - Notify on critical failures (via configured notification channels)
-     - Failed jobs for one schedule/template don't block others
+     - Failed jobs for one schedule don't block others
      - Agents can implement their own retry logic internally
+     - Retry configuration from schedule is applied to all job attempts
 
-12. **Instance Management** (Automatic):
-
-   - **Instance Spawning**:
-     - Automatically spawn new instances when:
-       - Job queue has pending jobs and no available capacity
-       - Average instance load exceeds `scaleUpThreshold`
-       - Pending jobs exceed `pendingJobsThreshold`
-     - **Spawning Mechanism** (varies by deployment type):
-       - **Containers**: Orchestrator calls container orchestration API (Docker API, Kubernetes API, etc.) to create new container instances. Container image is determined by agent type and version. Instance endpoint URL is assigned based on container networking (e.g., `http://agent-instance-{id}:{port}`).
-       - **Lambda/Cloud Functions**: Orchestrator invokes function deployment API to create new function instances. Instance endpoint URL is the function's invocation URL. Note: Serverless functions may have cold starts.
-       - **Kubernetes**: Orchestrator creates new Pod replicas via Kubernetes API. Instance endpoint URL is the Service endpoint for the pod.
-       - **Cloud Run/ECS**: Orchestrator creates new task/service instances via cloud provider API. Instance endpoint URL is assigned by the cloud platform.
-     - Create instance record in `AgentInstance` table with:
-       - Unique instance ID (generated by orchestrator, e.g., `{agentId}-instance-{timestamp}-{random}`)
-       - Agent type and active version (from `AgentVersionDeployment`)
-       - Instance endpoint URL (assigned by orchestrator based on deployment type and networking)
-       - Initial status: `'spawning'` → `'active'` when ready (instance reports ready via health check)
-       - Capacity from config (default or agent-specific)
-     - **Instance Discovery**: New instances register themselves in `AgentInstance` table when they start, or orchestrator creates the record during spawning
-   - **Instance Health Monitoring**:
-     - Continuously monitor instance heartbeats (query `AgentInstance.lastHeartbeat`)
-     - Mark instances as `'unhealthy'` if heartbeat is stale (exceeds `heartbeatTimeout`)
-     - Automatically spawn replacement instances for failed/unhealthy instances
-     - Terminate and remove failed instance records
-   - **Auto-Scaling**:
-     - **Scale Up**: Spawn new instances when load is high (respecting `maxInstances` limit)
-     - **Scale Down**: Terminate idle instances when load is low (respecting `minInstances` limit)
-     - Apply cooldown periods to prevent rapid scaling oscillations
-     - Terminate instances that have been idle for `idleTimeout`
-   - **Load Balancing**: Distribute jobs based on instance capacity and current load
-   - **Failover**: Automatically route jobs to healthy instances when others fail
-   - **Capacity Tracking**: Update instance `currentLoad` as jobs start and complete
-   - **Instance Lifecycle**: Fully manage instance lifecycle (spawn → active → idle → terminate)
-
-13. **Metrics Collection**:
+12. **Metrics Collection**:
 
    - Agents write metrics to database upon completion
    - Orchestrator queries database for job and pipeline status
    - Track schedule execution history in `ScheduleExecution` table
-   - Track instance performance and utilization
    - Learning Agent reads metrics from database independently (runs on its own schedule)
-
-14. **Return**: Orchestration results (job IDs, status, metadata for all scheduled agents, including expanded parameter counts and instance assignments)
 
 ## Admin Interface Usage
 
-Admins can create and manage schedules, job templates, and pipelines through the admin interface. The orchestrator dynamically loads and executes these configurations without any code changes.
+Admins can create and manage schedules and pipelines through the admin interface. The orchestrator dynamically loads and executes these configurations without any code changes.
 
 ### Creating a Schedule
 
-1. **Create a JobTemplate** (if it doesn't exist):
-   - Navigate to `/admin/scheduler/job-templates`
-   - Click "Create Job Template"
-   - Select an agent from `AgentRegistry`
-   - Define default parameters
-   - Configure retry settings and timeout
-   - Save the template
-
-2. **Create a Schedule**:
-   - Navigate to `/admin/scheduler/schedules`
+1. **Navigate to Schedules**:
+   - Go to `/admin/scheduler/schedules`
    - Click "Create Schedule"
-   - Select a `JobTemplate`
-   - Choose schedule type (cron, interval, or on-demand)
-   - Configure schedule timing (cron expression or interval)
-   - Configure parameter expansion (if needed):
-     - Enable ticker expansion: Select scope (all, active, or specific tickers)
-     - Enable user expansion: Select users or filter by ticker subscriptions
-     - Set batch size and stagger delay
-   - Save the schedule
+
+2. **Configure Schedule**:
+   - **Basic Info**: Name, description
+   - **Target**: Choose `targetType`:
+     - **Agent: Select `agentId` from available agents
+     - **Pipeline**: Select `pipelineId` from available pipelines
+   - **Timing**:
+     - **Repeat**: Choose `'once'` for one-time execution or `'repeating'` for recurring
+     - **For Repeating**:
+       - **Cron**: Provide cron expression (e.g., `"0 2 * * 0"` for weekly Sunday 2 AM)
+       - **Interval**: Provide interval in milliseconds (e.g., `3600000` for hourly)
+     - **Timezone**: Default is `'America/New_York'`
+     - **Start At**: Optional start time (for one-time or first run of repeating)
+   - **Parameters**: Set agent parameters (JSON object)
+   - **ID Expansions** (optional): For agents that accept ID parameters:
+     - Add expansion for each ID parameter (e.g., `tickerId`, `userId`)
+     - **Table**: Database table name (e.g., `'Ticker'`, `'User'`)
+     - **Value**: 
+       - `'all'` to expand to all IDs in the table
+       - Specific ID string (e.g., `'AAPL'`) for single ID
+     - **Batch Size**: Number of IDs per batch (default: 10)
+     - **Stagger Delay**: Delay between batches in milliseconds (default: 1000)
+   - **Retry Config**: Configure retry behavior (max retries, backoff, delay)
+   - **Timeout**: Job timeout in milliseconds
+   - **Priority**: Job priority (default: 0)
+   - **Enabled**: Toggle to enable/disable schedule
+
+3. **Save the Schedule**
 
 ### Creating a Pipeline
 
-1. **Ensure JobTemplates exist** for all pipeline steps
-
-2. **Create a Pipeline**:
-   - Navigate to `/admin/scheduler/pipelines`
+1. **Navigate to Pipelines**:
+   - Go to `/admin/scheduler/pipelines`
    - Click "Create Pipeline"
-   - Add pipeline steps:
-     - Select a `JobTemplate` for each step
-     - Define step dependencies (`dependsOn`)
-     - Configure parallel execution (`parallel: true/false`)
-     - Add conditional logic (e.g., data freshness checks)
-   - Configure parameter expansion (if needed)
-   - Save the pipeline
 
-3. **Create a Schedule for the Pipeline**:
-   - Create a schedule that references the pipeline (instead of a single job template)
-     - The orchestrator will execute the pipeline when the schedule triggers
+2. **Configure Pipeline**:
+   - **Basic Info**: Name, description
+   - **Steps**: Add pipeline steps:
+     - **Agent**: Select `agentId` for each step
+     - **Parameters**: Step-specific parameters (JSON object)
+     - **Dependencies**: Define `dependsOn` (step IDs this step depends on)
+     - **Parallel**: Toggle if step can run in parallel with others
+     - **Retry Config**: Step-specific retry configuration
+     - **Timeout**: Step-specific timeout
+   - **Enabled**: Toggle to enable/disable pipeline
+
+3. **Save the Pipeline**
+
+4. **Create a Schedule for the Pipeline**:
+   - Create a schedule with `targetType: 'pipeline'` and select the pipeline
+   - Configure ID expansions if needed (applies to all pipeline steps)
 
 ### Example: Query Strategy Agent Schedule
 
-**JobTemplate**:
-- `id`: "query-strategy-entity-graph"
-- `agentId`: "query-strategy"
-- `defaultParams`: `{ "refreshEntityGraph": true }`
-- `expansionParams`: `["ticker"]`
-
 **Schedule**:
 - `name`: "Weekly Entity Graph Refresh"
-- `type`: "cron"
-- `cronExpression`: "0 2 * * 0" (Sunday 2 AM)
-- `jobTemplateId`: "query-strategy-entity-graph"
-- `expansionConfig.expandTickers`: `{ scope: "all", batchSize: 10, staggerDelay: 1000 }`
+- `repeat`: `'repeating'`
+- `cronExpression`: `"0 2 * * 0"` (Sunday 2 AM)
+- `targetType`: `'agent'`
+- `agentId`: `"query-strategy"`
+- `params`: `{ "refreshEntityGraph": true }`
+- `idExpansions`: `{ tickerId: { table: "Ticker", value: "all", batchSize: 10, staggerDelay: 1000 } }`
 
-**Result**: Every Sunday at 2 AM, the orchestrator expands to all tickers and creates 100 jobs (one per ticker) that are distributed across available agent instances in batches of 10.
+**Result**: Every Sunday at 2 AM, the scheduler:
+1. Queries `Ticker` table and finds 100 enabled tickers
+2. Creates 100 job inputs (one per ticker)
+3. Processes in batches of 10 with 1 second delay between batches
+4. Each job gets `params: { tickerId: '<specific-ticker-id>', refreshEntityGraph: true }`
+
+### Example: One-time Agent Execution
+
+**Schedule**:
+- `name`: "One-time Data Collection for AAPL"
+- `repeat`: `'once'`
+- `startAt`: `"2024-01-15T10:00:00Z"`
+- `targetType`: `'agent'`
+- `agentId`: `"data-collection"`
+- `params`: `{ "source": "news" }`
+- `idExpansions`: `{ tickerId: { table: "Ticker", value: "AAPL" } }`
+
+**Result**: On January 15, 2024 at 10:00 AM, the scheduler creates a single job with `params: { tickerId: "AAPL", source: "news" }`.
+
+### Example: Pipeline Schedule with ID Expansion
+
+**Pipeline**:
+- `name`: "Newsletter Generation Pipeline"
+- `steps`: Array of step objects:
+  - `{ stepId: "collect", agentId: "data-collection", parallel: false }`
+  - `{ stepId: "analyze", agentId: "analysis", dependsOn: ["collect"], parallel: false }`
+  - `{ stepId: "generate", agentId: "content-generation", dependsOn: ["analyze"], parallel: false }`
+
+**Schedule**:
+- `name`: "Daily Newsletter for All Tickers"
+- `repeat`: `'repeating'`
+- `cronExpression`: `"0 8 * * *"` (Daily at 8 AM)
+- `targetType`: `'pipeline'`
+- `pipelineId`: `"newsletter-generation-pipeline"`
+- `idExpansions`: `{ tickerId: { table: "Ticker", value: "all", batchSize: 5, staggerDelay: 2000 } }`
+
+**Result**: Every day at 8 AM, the scheduler:
+1. Queries `Ticker` table and finds 50 enabled tickers
+2. Creates 50 pipeline execution contexts (one per ticker)
+3. Processes in batches of 5 with 2 second delay between batches
+4. Each context runs the pipeline: collect → analyze → generate (sequential)
 
 ## Sequence Diagram
 
@@ -781,81 +575,77 @@ Admins can create and manage schedules, job templates, and pipelines through the
   chart="
 flowchart TD
     subgraph Admin [Admin Interface]
-        A1[Admin Creates<br/>JobTemplate]
-        A2[Admin Creates<br/>Schedule]
-        A3[Admin Creates<br/>Pipeline]
+        A1[Admin Creates<br/>Schedule]
+        A2[Admin Creates<br/>Pipeline]
     end
     
-    A1 --> DB1[(Database<br/>JobTemplate Table)]
-    A2 --> DB2[(Database<br/>Schedule Table)]
-    A3 --> DB3[(Database<br/>Pipeline Table)]
+    A1 --> DB1[(Database<br/>Schedule Table)]
+    A2 --> DB2[(Database<br/>Pipeline Table)]
     
-    subgraph Triggers [Scheduler Triggers]
-        T1[Cron Trigger<br/>from Schedule Table]
-        T2[Interval Trigger<br/>from Schedule Table]
-        T3[Manual Trigger<br/>via API]
-        T4[Event Trigger<br/>e.g., entity graph updated]
+    subgraph Worker [BullMQ Worker - Long Running Process]
+        S[Scheduler/Orchestrator<br/>BullMQ Worker]
+        S --> S0[Poll Database<br/>for Schedules]
+        S0 --> S0
     end
     
-    DB1 --> S[Scheduler/Orchestrator<br/>Loads from DB]
-    DB2 --> S
-    DB3 --> S
-    DB4[(AgentRegistry<br/>Table)] --> S
+    DB1 --> S0
+    DB2 --> S0
+    DB3[(AgentRegistry<br/>Table)] --> S
     
-    T1 --> S
-    T2 --> S
-    T3 --> S
-    T4 --> S
+    S0 -->|Schedule Time Arrived| S1[Enqueue to BullMQ<br/>Queue]
+    S1 --> S2[BullMQ Worker<br/>Picks Up Job]
+    S2 --> S3[Load Schedule<br/>from Database]
     
-    S --> S1[Load Schedule<br/>from Database]
-    S1 --> S2[Load JobTemplate<br/>from Database]
-    S2 --> S3[Load Agent Metadata<br/>from AgentRegistry]
+    S3 --> S4{Target Type?}
     
-    S3 --> S4{Has Parameter<br/>Expansion?}
+    S4 -->|Agent| S5[Load Agent Metadata<br/>from AgentRegistry]
+    S4 -->|Pipeline| S6[Load Pipeline Steps<br/>from Database]
     
-    S4 -->|Yes - Ticker Expansion| S5[Load Tickers from DB<br/>Based on scope<br/>e.g., 100 tickers]
-    S4 -->|Yes - User Expansion| S6[Load Users from DB<br/>Based on filters]
-    S4 -->|Yes - Both| S7[Load User-Ticker<br/>Combinations]
-    S4 -->|No| S8[Create Single Job]
+    S5 --> S7{Has ID<br/>Expansion?}
+    S6 --> S7
     
-    S5 --> S9[Batch Tickers<br/>batchSize: 10-20<br/>100 tickers → 5-10 batches]
-    S9 --> S10[Create Execution Records<br/>100 tickers = 100 executions]
-    S10 --> S11[Invoke Agent HTTP Endpoints<br/>in Batches with staggerDelay]
+    S7 -->|Yes - value: 'all'| S8[Query Table for All IDs<br/>e.g., Ticker table<br/>→ 100 tickers]
+    S7 -->|Yes - specific ID| S9[Use Single ID<br/>e.g., tickerId: 'AAPL']
+    S7 -->|No| S10[Create Single Job Input]
     
-    S6 --> S12[Invoke Agent per User]
-    S12 --> S11
+    S8 --> S11[Group IDs into Batches<br/>batchSize: 10<br/>100 IDs → 10 batches]
+    S11 --> S12[Create Job Inputs<br/>One per ID<br/>100 IDs = 100 inputs]
     
-    S7 --> S13[Invoke Agent per<br/>User-Ticker Pair]
-    S13 --> S11
+    S9 --> S13[Create Single Job Input<br/>with specific ID]
     
-    S8 --> S11
+    S12 --> S14[Process Batches Sequentially<br/>with staggerDelay between batches]
+    S13 --> S14
+    S10 --> S14
     
-    S1 --> S14{Is Pipeline?}
-    S14 -->|Yes| S15[Load Pipeline Steps<br/>from Database]
-    S15 --> S16[Build Dependency Graph]
-    S16 --> S17[Invoke Agents for Each Step<br/>with Dependencies]
-    S17 --> S11
+    S14 --> S15[Within Batch: Process Jobs<br/>in Parallel up to batchSize]
     
-    S11 --> S20[Select Agent Instance<br/>Based on Load Balancing]
-    S20 --> AG1[Agent Instance HTTP Endpoints<br/>POST /execute]
+    S15 --> S16{Is Pipeline?}
+    S16 -->|Yes| S17[Build Dependency Graph<br/>from Pipeline Steps]
+    S17 --> S18[Execute Steps with Dependencies<br/>Sequential or Parallel]
+    S18 --> S19[Invoke Agent HTTP Endpoints<br/>for Each Step]
+    S16 -->|No| S19[Invoke Agent HTTP Endpoints<br/>for Single Agent]
     
-    subgraph Agents [Agent Instances Execute Independently - Any Language/Platform]
+    S19 --> AG1[Agent HTTP Endpoint<br/>POST /execute]
+    
+    subgraph Agents [Agent Executes - One-off Execution]
         direction TB
-        AG2[Agent Instance Accepts Job<br/>Returns status: accepted<br/>Updates currentLoad]
-        AG3[Agent Instance Executes Work<br/>Asynchronously]
-        AG4[Agent Instance Updates DB<br/>AgentJobExecution table]
-        AG5[Agent Instance Writes Results<br/>to Database<br/>Decrements currentLoad]
+        AG2[Agent Accepts Job<br/>Starts Execution]
+        AG3[Agent Executes Work<br/>Reads/Writes to Database]
+        AG4[Agent Updates DB<br/>AgentJobExecution table]
+        AG5[Agent Writes Results<br/>to Database]
+        AG6[Agent Shuts Down<br/>After Completion]
     end
     
     AG1 --> AG2
     AG2 --> AG3
     AG3 --> AG4
     AG4 --> AG5
+    AG5 --> AG6
     
-    AG5 --> DB5[(Database<br/>All agents read/write<br/>independently)]
+    AG6 --> DB4[(Database<br/>All agents read/write<br/>independently)]
     
-    DB5 --> S18[Orchestrator queries DB<br/>AgentJobExecution & AgentInstance tables<br/>for job status & instance health]
-    S18 --> S19[Update ScheduleExecution<br/>Table]
-    S19 --> R[Return orchestration results]
+    DB4 --> S21[Orchestrator queries DB<br/>AgentJobExecution table<br/>for job status]
+    S21 --> S22[Write to ScheduleExecution<br/>Table]
+    S22 --> S0
 "
 />
