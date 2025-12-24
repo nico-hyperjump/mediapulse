@@ -23,11 +23,11 @@ flowchart TB
     end
     
     subgraph Newsletter [Newsletter Generation Pipeline]
-        Scheduler[Scheduler Agent<br/>• Database-driven schedules<br/>• Admin-configurable<br/>• Executes pipelines from DB]
-        Analysis[Analysis Agent<br/>• Triggered by Scheduler<br/>• Reads collected data from DB<br/>• Works independently]
-        Content[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Sequential per user<br/>• Works independently]
-        QA[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Works independently]
-        Delivery[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Works independently]
+        Orchestrator[Scheduler/Orchestrator<br/>• Not an agent<br/>• Database-driven schedules<br/>• Admin-configurable<br/>• Executes pipelines from DB<br/>• Distributes jobs across instances]
+        Analysis[Analysis Agent<br/>• Triggered by Orchestrator<br/>• Reads collected data from DB<br/>• Works independently<br/>• Multiple instances can run in parallel]
+        Content[Content Generation Agent<br/>• Triggered by Orchestrator<br/>• Reads analysis from DB<br/>• Works independently<br/>• Multiple instances can run in parallel<br/>• Processes one user-ticker pair per job]
+        QA[Quality Assurance Agent<br/>• Triggered by Orchestrator<br/>• Reads newsletter from DB<br/>• Works independently<br/>• Multiple instances can run in parallel]
+        Delivery[Delivery Agent<br/>• Triggered by Orchestrator<br/>• Reads approved newsletter from DB<br/>• Works independently<br/>• Multiple instances can run in parallel]
     end
     
     subgraph Background [Background Agents]
@@ -38,16 +38,16 @@ flowchart TB
     DC -->|Writes collected<br/>data to DB| DB
     DB -->|Reads queries| DC
     DB -->|Reads collected data| Analysis
-    Scheduler -->|Triggers| Analysis
+    Orchestrator -->|Triggers| Analysis
     Analysis -->|Writes analysis<br/>results to DB| DB
     DB -->|Reads analysis| Content
-    Scheduler -->|Triggers| Content
+    Orchestrator -->|Triggers| Content
     Content -->|Writes newsletter<br/>to DB| DB
     DB -->|Reads newsletter| QA
-    Scheduler -->|Triggers| QA
+    Orchestrator -->|Triggers| QA
     QA -->|Writes approval<br/>status to DB| DB
     DB -->|Reads approved<br/>newsletter| Delivery
-    Scheduler -->|Triggers| Delivery
+    Orchestrator -->|Triggers| Delivery
     Delivery -->|Writes metrics| DB
     Learning -->|Reads metrics<br/>Updates configs| DB
 "
@@ -137,10 +137,10 @@ flowchart TD
     F1 -->|No - default| E[Use existing data<br/>Continue pipeline]
     F2 --> E
     E --> G[Store Analysis Results<br/>in Database<br/>Generic structure with all types]
-    G --> H[Content Generation Agent<br/>• Triggered by Scheduler<br/>• Reads analysis from DB<br/>• Reads user prefs from DB<br/>• Generates newsletter<br/>• Writes newsletter to DB]
-    H --> I[Quality Assurance Agent<br/>• Triggered by Scheduler<br/>• Reads newsletter from DB<br/>• Validates content<br/>• Checks compliance<br/>• Writes approval status to DB]
+    G --> H[Content Generation Agent<br/>• Triggered by Orchestrator<br/>• Reads analysis from DB<br/>• Reads user prefs from DB<br/>• Generates newsletter<br/>• Writes newsletter to DB<br/>• Multiple instances can run in parallel<br/>• Each job processes one user-ticker pair]
+    H --> I[Quality Assurance Agent<br/>• Triggered by Orchestrator<br/>• Reads newsletter from DB<br/>• Validates content<br/>• Checks compliance<br/>• Writes approval status to DB<br/>• Multiple instances can run in parallel]
     I --> J{Approved?}
-    J -->|Yes| K[Delivery Agent<br/>• Triggered by Scheduler<br/>• Reads approved newsletter from DB<br/>• Sends email<br/>• Updates dashboard<br/>• Writes metrics to DB]
+    J -->|Yes| K[Delivery Agent<br/>• Triggered by Orchestrator<br/>• Reads approved newsletter from DB<br/>• Sends email<br/>• Updates dashboard<br/>• Writes metrics to DB<br/>• Multiple instances can run in parallel]
     J -->|No| H
     K --> L[Store Delivery Metrics<br/>in Database]
 "
@@ -162,7 +162,7 @@ sequenceDiagram
     participant QS as Query Strategy Agent
     participant DB as Database
     participant DC as Data Collection Agent
-    participant Scheduler as Scheduler Agent
+    participant Orchestrator as Scheduler/Orchestrator
     participant Analysis as Analysis Agent
     participant Content as Content Gen Agent
     participant QA as QA Agent
@@ -180,30 +180,30 @@ sequenceDiagram
     DC->>DC: Process, deduplicate, and filter content
     DC->>DB: Store collected data (timestamped)
 
-    Note over Scheduler: Scheduled: Newsletter Generation Pipeline
-    Scheduler->>DB: Check data freshness
+    Note over Orchestrator: Scheduled: Newsletter Generation Pipeline
+    Orchestrator->>DB: Check data freshness
     alt Data stale
-        Scheduler->>DC: Trigger immediate collection
+        Orchestrator->>DC: Trigger immediate collection
         DC->>DB: Store fresh data
     end
 
-    Scheduler->>Analysis: Trigger analysis (independent execution)
+    Orchestrator->>Analysis: Trigger analysis (independent execution)
     Analysis->>DB: Read collected data
     Analysis->>Analysis: Perform analysis
     Analysis->>DB: Store analysis results
 
-    Scheduler->>Content: Trigger content generation (independent execution)
+    Orchestrator->>Content: Trigger content generation (independent execution)
     Content->>DB: Read analysis results
     Content->>DB: Read user prefs
     Content->>Content: Generate newsletter
     Content->>DB: Store newsletter draft
 
-    Scheduler->>QA: Trigger QA (independent execution)
+    Orchestrator->>QA: Trigger QA (independent execution)
     QA->>DB: Read newsletter draft
     QA->>QA: Validate content
     QA->>DB: Store approval status
     alt Approved
-        Scheduler->>Delivery: Trigger delivery (independent execution)
+        Orchestrator->>Delivery: Trigger delivery (independent execution)
         Delivery->>DB: Read approved newsletter
         Delivery->>Delivery: Send email
         Delivery->>DB: Store delivery metrics
@@ -211,7 +211,7 @@ sequenceDiagram
         User->>DB: Submit section feedback (Like/Dislike, Useful/Irrelevant)
     else Not Approved
         QA->>DB: Write requiresRevision: true
-        Note over Scheduler: Scheduler or retry mechanism<br/>can enqueue Content Gen retry job<br/>based on QA results
+        Note over Orchestrator: Orchestrator or retry mechanism<br/>can enqueue Content Gen retry job<br/>based on QA results
     end
 
     Note over Learning: Daily midnight: Learning
@@ -275,6 +275,7 @@ flowchart LR
 
 ### 2. **Independent Scheduling**
 
+- The **Scheduler/Orchestrator** manages all schedules (it is not an agent)
 - Each agent has its own optimal schedule (admin-configurable)
 - Schedules are stored in the database (`Schedule` table)
 - Job templates define agent parameters and expansion rules
@@ -292,8 +293,10 @@ flowchart LR
 
 ### 4. **Scalability**
 
-- Agents can be scaled horizontally (multiple workers)
-- Job queue handles load distribution
+- **Agent Instances**: Multiple instances of the same agent version can run in parallel for horizontal scaling
+- **Job Distribution**: Orchestrator distributes jobs across available agent instances using load balancing
+- **Job Division**: Large jobs (e.g., 100 keywords) can be divided into smaller sub-jobs and distributed across instances
+- **Instance Management**: Each agent instance registers itself and reports capacity/load for intelligent job distribution
 - Database connection pooling
 - Caching layer for frequently accessed data
 

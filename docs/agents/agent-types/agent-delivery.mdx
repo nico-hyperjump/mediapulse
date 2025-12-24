@@ -1,0 +1,157 @@
+---
+title: Delivery Agent
+---
+
+<Callout type="info">
+ID: `delivery`
+</Callout>
+
+## Purpose
+
+Deliver approved newsletters via email and update web dashboard, track delivery status.
+
+## Inputs
+
+- `ticker: string` - Company identifier
+- `userId: string` - User identifier
+- `newsletterId: string` - Newsletter identifier
+- `deliveryChannels: ('email' | 'dashboard')[]` - Where to deliver
+- `scheduleTime?: Date` - Optional scheduled delivery time
+
+**Note**: The agent reads approved newsletter content and user information directly from the database. It does not receive data from the QA Agent. The agent works independently and queries the database for the approved newsletter and user details. Each newsletter is personalized for a specific user (identified by `userId`), so each delivery job handles a single recipient.
+
+**Multiple Recipients**: When multiple users are subscribed to the same ticker, the Scheduler/Orchestrator creates separate delivery jobs for each user-ticker subscription. Each delivery job handles one personalized newsletter for one user. Multiple delivery jobs execute in parallel across multiple agent instances, allowing efficient delivery to all subscribers. Rate limiting (configured in `rateLimiting.emailsPerMinute`) applies across all concurrent delivery jobs to respect email provider limits.
+
+## Configurations
+
+Configuration is stored in `AgentConfig` with identifier `delivery` and the following structure:
+
+```typescript
+{
+  email: {
+    provider: 'resend' | 'sendgrid',
+    apiKey: string,
+    fromAddress: string,
+    fromName: string,
+    replyTo: string,
+    templates: {
+      daily: 'templates/email-daily.html',
+      weekly: 'templates/email-weekly.html'
+    },
+    retry: {
+      maxAttempts: 3,
+      backoff: 'exponential',
+      delay: 1000
+    },
+    tracking: {
+      openTracking: true,
+      clickTracking: true,
+      unsubscribeLink: true
+    },
+    feedback: {
+      enabled: true,
+      buttonTypes: ['like' | 'dislike' | 'useful' | 'irrelevant' | 'custom'],
+      customButtons?: Array<{ label: string, value: string, icon?: string }>,
+      placement: 'inline' | 'bottom' | 'both',
+      style: 'buttons' | 'icons' | 'text-links'
+    }
+  },
+  dashboard: {
+    updateEndpoint: string,
+    cacheStrategy: 'cache-first' | 'network-first',
+    notificationEnabled: true
+  },
+  rateLimiting: {
+    emailsPerMinute: 100,
+    batchSize: 50
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'delivery',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
+  newsletterId: string,
+  userId: string,
+  timestamp: Date,
+  executionTime: number,
+  delivery: {
+    email: {
+      status: 'sent' | 'failed' | 'bounced' | 'pending',
+      email: string,
+      messageId?: string,
+      error?: string,
+      deliveredAt?: Date
+    },
+    dashboard: {
+      updated: boolean,
+      publishedAt: Date,
+      url: string
+    }
+  },
+  metadata: {
+    deliveryTime: number,
+    errors: Array<{ type: string, message: string }>
+  }
+}
+```
+
+## Process
+
+1. **Initialize**: Load email config
+2. **Read Data**: Query database for approved newsletter and user information (independent of QA Agent)
+3. **Email Delivery** (if enabled):
+
+   - **Personalization**: Newsletter is already personalized for the user (from Content Generation Agent)
+   - **Template Rendering**: Render HTML email with newsletter content
+   - **Feedback Buttons**: Embed interactive feedback buttons in each newsletter section
+     - Each section includes feedback buttons (Like/Dislike, Useful/Irrelevant, or custom options)
+     - Buttons link to feedback API endpoints with section identifiers
+     - Feedback is tracked per section and per user
+   - **Sending**: Send email to the user (respect rate limits)
+   - **Tracking**: Add tracking pixels and links
+   - **Error Handling**: Retry failed sends with exponential backoff
+   - **Status Tracking**: Record delivery status for the recipient
+
+4. **Dashboard Update** (if enabled):
+
+   - Save newsletter to database
+   - Update user's newsletter feed
+   - **Interactive Feedback**: Render feedback buttons in dashboard view
+     - Each section displays feedback buttons
+     - Real-time feedback submission via API
+     - Visual feedback confirmation after submission
+   - Invalidate cache if needed
+   - Send notification (if enabled)
+
+5. **Delivery Tracking**:
+
+   - Record delivery attempts and results
+   - Update newsletter status in database
+   - Log metrics for Learning Agent
+   - Track feedback button impressions and clicks
+
+6. **Return**: Delivery results
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler/Orchestrator] --> B[Delivery Agent<br/>Triggered independently<br/>Multiple instances can run in parallel]
+    B --> C[Agent reads approved newsletter<br/>from Database]
+    C --> C2[Agent reads user info<br/>from Database]
+    C2 --> D[Parallel Delivery]
+    
+    D --> E1[Email Delivery<br/>Render HTML template<br/>Send to user<br/>Add tracking<br/>Retry failures]
+    D --> E2[Dashboard Update<br/>Save to database<br/>Update user feed<br/>Invalidate cache<br/>Send notification]
+    
+    E1 --> F[Track delivery status]
+    E2 --> F
+    F --> G[Write delivery metrics to Database]
+    G --> H[Delivery complete<br/>Metrics available for Learning Agent]
+"
+/>

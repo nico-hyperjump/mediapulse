@@ -1,0 +1,253 @@
+---
+title: Analysis Agent
+---
+
+<Callout type="info">
+ID: `analysis`
+</Callout>
+
+
+## Purpose
+
+Analyze collected media data to generate insights using a plugin-based architecture. The agent dynamically loads and executes registered analysis types, allowing for easy addition, removal, or modification of analysis capabilities without code changes.
+
+## Analysis Types
+
+The Analysis Agent uses a **plugin-based system** where analysis types are registered in the database and loaded dynamically. By default, the system includes three built-in analysis types:
+
+1. **Event/Context Analysis** (`event`): Identifies and analyzes external events that could affect the company, such as natural disasters, political discourse, regulatory changes, economic shifts, social movements, and industry disruptions. Assesses the potential impact of these events on the company's operations, reputation, and strategic positioning.
+
+2. **Competitive Analysis** (`competitive`): Monitors media coverage of competitors and compares it to the company's coverage. Identifies industry trends, tracks competitive positioning in the media, and provides insights into how competitors are being perceived relative to the company.
+
+3. **Sentiment Analysis** (`sentiment`): Measures public perception and emotional tone of media coverage about the company. Analyzes how positively or negatively the company is being discussed across news and social media, tracks sentiment trends over time, and identifies key drivers of sentiment changes.
+
+**New analysis types can be added** by registering them in the `AnalysisTypeRegistry` table. See [Extending Analysis Types](/agents/extending-analysis-types) for details.
+
+## Inputs
+
+- `ticker: string` - Company identifier
+- `analysisTypes: string[]` - Which analyses to perform (dynamically loaded from `AnalysisTypeRegistry`, e.g., `['sentiment', 'competitive', 'event']`)
+- `userPreferences: { focusAreas: string[] }` - Optional user context
+
+**Note**: The agent reads collected data directly from the database. It does not receive data from the Data Collection Agent. The agent works independently and queries the database for the latest collected data for the specified ticker.
+
+The `analysisTypes` parameter references registered analysis types from the `AnalysisTypeRegistry` table. Only enabled analysis types can be executed.
+
+## Analysis Plugin Interface
+
+All analysis plugins must implement the standard interface to be registered and executed by the Analysis Agent:
+
+```typescript
+interface AnalysisPlugin {
+  id: string                    // Unique identifier (e.g., 'sentiment', 'competitive')
+  name: string                  // Human-readable name
+  version: string               // Plugin version
+  execute: (
+    data: CollectedData,
+    config: AnalysisConfig
+  ) => Promise<AnalysisResult>
+  validateConfig: (config: any) => boolean
+  getOutputSchema: () => ZodSchema
+  getSectionTemplate?: () => string // Optional: template for content generation
+}
+```
+
+### Plugin Registration
+
+Plugins are registered in the `AnalysisTypeRegistry` database table with:
+- Metadata (id, name, version, description)
+- Configuration schema (Zod schema for validation)
+- Output schema (Zod schema for result validation)
+- Optional section template for content generation
+
+See [Extending Analysis Types](/agents/extending-analysis-types) for a complete guide on creating and registering new analysis plugins.
+
+## Configurations
+
+Analysis configurations are stored in `AgentConfig` with identifier `analysis` and a flexible structure that supports any registered analysis type:
+
+```typescript
+{
+  analysis: {
+    enabledTypes: string[],           // Which analysis types to run by default
+    [analysisTypeId: string]: {        // Dynamic config per analysis type
+      enabled: boolean,
+      // Type-specific configuration (validated by plugin's configSchema)
+      // Example for 'sentiment':
+      model: 'gpt-4',
+      sources: ['news', 'social'],
+      aggregation: 'weighted_average',
+      timeDecay: true
+      // Example for 'competitive':
+      peerGroupSize: 5,
+      comparisonMetrics: ['mediaMentions', 'sentiment', 'coverageVolume'],
+      industryTrends: true,
+      marketShare: true
+      // Example for 'event':
+      eventTypes: ['natural_disaster', 'political', 'regulatory', 'economic', 'social_movement', 'industry_disruption', 'crisis'],
+      impactAssessment: boolean,
+      earlyWarning: boolean,
+      minRelevanceScore: number
+    }
+  },
+  ai: {
+    model: 'gpt-4',
+    temperature: 0.3,
+    maxTokens: 2000
+  }
+}
+```
+
+**Configuration Flexibility**:
+- Each analysis type has its own configuration section, validated by the plugin's `configSchema`
+- Configurations can be overridden per ticker or user
+- New analysis types automatically get their own config section when registered
+- Configurations are hot-reloadable without agent restart
+
+## Outputs
+
+The output structure is generic and supports any registered analysis type:
+
+```typescript
+{
+  agentId: 'analysis',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
+  ticker: string,
+  timestamp: Date,
+  executionTime: number,
+  analyses: {
+    [analysisType: string]: {          // Dynamic: one entry per executed analysis type
+      type: string,                     // Analysis type ID
+      results: any,                     // Type-safe results (validated by plugin's outputSchema)
+      metadata: {
+        executionTime: number,
+        confidence: number,
+        dataQuality: number
+      }
+    }
+  },
+  insights: Array<{
+    type: string,                       // Analysis type ID
+    priority: 'high' | 'medium' | 'low',
+    title: string,
+    description: string,
+    dataPoints: string[]
+  }>,
+  metadata: {
+    dataQuality: number,
+    analysisConfidence: number,
+    executedTypes: string[]             // Which analysis types were executed
+  }
+}
+```
+
+**Example output** (for built-in analysis types):
+
+```typescript
+{
+  agentId: 'analysis',
+  ticker: 'AAPL',
+  timestamp: Date,
+  executionTime: 45000,
+  analyses: {
+    sentiment: {
+      type: 'sentiment',
+      results: {
+        overall: 0.65,                  // -1 to 1
+        breakdown: {
+          news: 0.7,
+          social: 0.6
+        },
+        trend: 'improving',
+        keyDrivers: [...],
+        summary: '...'
+      },
+      metadata: { ... }
+    },
+    competitive: {
+      type: 'competitive',
+      results: {
+        marketPosition: '...',
+        peerComparison: [...],
+        industryTrends: [...],
+        summary: '...'
+      },
+      metadata: { ... }
+    },
+    event: {
+      type: 'event',
+      results: {
+        identifiedEvents: [...],
+        riskLevel: 'medium',
+        opportunities: [...],
+        summary: '...'
+      },
+      metadata: { ... }
+    }
+  },
+  insights: [...],
+  metadata: {
+    dataQuality: 0.92,
+    analysisConfidence: 0.88,
+    executedTypes: ['sentiment', 'competitive', 'event']
+  }
+}
+```
+
+**Type Safety**: Each analysis plugin's `outputSchema` ensures type-safe results. The Content Generation Agent uses these schemas to properly render analysis results in newsletters.
+
+## Process
+
+1. **Initialize**: 
+   - Load analysis config from database
+   - Query `AnalysisTypeRegistry` for enabled analysis types
+   - Load plugin configurations for requested `analysisTypes`
+   - Validate inputs and configurations
+
+2. **Plugin Discovery**:
+   - Look up each requested analysis type in `AnalysisTypeRegistry`
+   - Verify plugins are enabled and configurations are valid
+   - Load plugin implementations (built-in or custom)
+
+3. **Read Data**: Query database for collected data for the specified ticker (independent of Data Collection Agent)
+
+4. **Parallel Analysis Execution**:
+   - Execute each requested analysis type in parallel
+   - Each plugin's `execute()` method is called with collected data and its configuration
+   - Results are validated against the plugin's `outputSchema`
+
+5. **Insight Extraction**: 
+   - Use AI to identify top insights across all executed analyses
+   - Cross-reference insights from different analysis types
+   - Prioritize insights based on user preferences and focus areas
+
+6. **Return**: Structured analysis results with all executed analysis types
+
+**Dynamic Execution**: The number of parallel workers is determined by the number of requested analysis types, not a fixed value. New analysis types are automatically executed when registered and enabled.
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler/Orchestrator] --> B[Analysis Agent<br/>Triggered independently<br/>Multiple instances can run in parallel]
+    B --> B1[Load config from Database]
+    B1 --> B2[Query AnalysisTypeRegistry<br/>for enabled plugins]
+    B2 --> C[Agent reads collected data<br/>from Database]
+    C --> D[Load requested analysis types<br/>from plugin registry]
+    D --> E[Parallel Analysis Execution<br/>Dynamic workers based on<br/>requested analysis types]
+    
+    E --> E1[Plugin 1: Execute<br/>e.g., Sentiment Analyzer<br/>Validate config<br/>Run analysis<br/>Validate output]
+    E --> E2[Plugin 2: Execute<br/>e.g., Competitive Analyzer<br/>Validate config<br/>Run analysis<br/>Validate output]
+    E --> E3[Plugin N: Execute<br/>e.g., Event Analyzer<br/>Validate config<br/>Run analysis<br/>Validate output]
+    E --> EN[Additional Plugins...<br/>Dynamically loaded]
+    
+    E1 --> F[AI: Extract top insights across analyses]
+    E2 --> F
+    E3 --> F
+    EN --> F
+    
+    F --> G[Write analysis results to Database<br/>Generic structure with all types]
+    G --> H[Analysis complete<br/>Results available for other agents]
+"
+/>

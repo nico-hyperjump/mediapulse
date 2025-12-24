@@ -1,0 +1,523 @@
+---
+title: Query Strategy Agent
+---
+
+<Callout type="info">
+ID: `query-strategy`
+</Callout>
+
+## Purpose
+
+Dynamically discover entities, maintain entity relationships, generate intelligent search queries, and optimize query strategies based on results. This agent ensures the Data Collection Agent knows what to search for and adapts to changing contexts over time.
+
+## What the Agent Does
+
+1. **Entity Discovery & Management**:
+
+   - Discovers and maintains entity relationships: competitors, suppliers, customers, executives, industry peers, partners
+   - Builds and updates entity graph database
+   - Extracts entities from regulatory filings, company websites, industry databases
+   - Tracks entity changes over time (new competitors, executive changes, partnerships)
+   - Identifies key personnel (CEO, CFO, CTO, board members, key engineers)
+
+2. **Dynamic Query Generation**:
+
+   - Generates search queries based on current context (company identifier, time period, recent events)
+   - Creates queries for use with admin-configured search sources (e.g., Serper.dev, Google Search API)
+   - Categorizes queries by type (news, socialMedia, web) for flexible routing
+   - Adapts queries based on what's trending or relevant
+   - Generates multi-variant queries (different phrasings, synonyms)
+   - Considers query effectiveness history
+
+3. **Keyword & Trend Evolution**:
+
+   - Tracks keyword popularity and evolution over time
+   - Identifies emerging trends and topics
+   - Discovers new relevant keywords through AI analysis
+   - Monitors industry jargon and terminology changes
+   - Tracks hashtag trends on social media
+
+4. **Query Optimization**:
+
+   - Analyzes which queries returned high-relevance results
+   - Learns from failed or low-yield queries
+   - Adjusts query strategies based on collection results
+   - A/B tests different query formulations
+   - Optimizes query frequency and timing
+
+5. **Context-Aware Query Building**:
+
+   - Considers recent events (earnings, product launches, news)
+   - Adjusts queries based on current events and trends
+   - Incorporates seasonal/cyclical patterns
+   - Adapts to breaking news or significant events
+
+## Inputs
+
+```typescript
+interface QueryStrategyInput {
+  identifier: {
+    type: "ticker" | "isin" | "cusip" | "sedol" | "custom"; // Identifier type
+    value: string; // Identifier value (e.g., "AAPL", "US0378331005")
+  };
+  companyName: string; // Full company name
+  market?: {
+    region: string; // 'US', 'EU', 'UK', 'JP', 'CN', etc.
+    exchange?: string; // 'NYSE', 'NASDAQ', 'LSE', 'TSE', etc.
+    currency?: string; // 'USD', 'EUR', 'GBP', 'JPY', etc.
+  };
+  timeWindow: {
+    start: Date;
+    end: Date;
+  };
+  context?: {
+    recentEvents?: string[]; // Recent significant events
+    earningsDate?: Date; // Upcoming or recent earnings (if applicable)
+    productLaunches?: Array<{ name: string; date: Date }>;
+  };
+  previousQueries?: Array<{
+    // For optimization
+    query: string;
+    source: string;
+    resultsCount: number;
+    relevanceScore: number;
+    timestamp: Date;
+  }>;
+  collectionResults?: {
+    // Feedback from Data Collection Agent
+    highRelevanceItems: number;
+    lowRelevanceItems: number;
+    missedTopics?: string[]; // Topics that should have been covered
+  };
+  refreshEntityGraph?: boolean; // Force entity graph refresh
+}
+```
+
+## Configurations
+
+These are stored in the `AgentConfig` table, key: `query-strategy`
+
+```typescript
+{
+  entityDiscovery: {
+    enabled: boolean,
+    sources: {
+      regulatoryFilings: {
+        enabled: boolean,
+        providers: Array<{
+          name: string,                 // 'sec-edgar', 'companies-house', 'sedar', 'asx', etc.
+          region: string,                // 'US', 'UK', 'CA', 'AU', etc.
+          enabled: boolean,
+          apiEndpoint?: string,          // Custom API endpoint if needed
+          apiKey?: string,               // API key if required
+          lookbackDays: number,          // How far back to analyze
+          filingTypes: string[]         // Region-specific filing types
+          // US: ['10-K', '10-Q', '8-K', 'DEF 14A']
+          // UK: ['annual-return', 'confirmation-statement']
+          // CA: ['annual-information-form', 'management-discussion']
+          // etc.
+        }>
+      },
+      companyWebsite: {
+        enabled: boolean,
+        sections: string[]             // ['about', 'investors', 'press', 'careers']
+      },
+      industryDatabases: {
+        enabled: boolean,
+        providers: string[]             // ['crunchbase', 'pitchbook', 'custom']
+      },
+      aiExtraction: {
+        enabled: boolean,
+        model: string,                  // 'gpt-4'
+        extractionPrompt: string       // Template for entity extraction
+      }
+    },
+    entityTypes: {
+      competitors: {
+        enabled: boolean,
+        maxCount: number,              // Max competitors to track
+        similarityThreshold: number    // Industry/sector similarity
+      },
+      suppliers: {
+        enabled: boolean,
+        minSignificance: 'high' | 'medium' | 'low'
+      },
+      customers: {
+        enabled: boolean,
+        minSignificance: 'high' | 'medium' | 'low'
+      },
+      executives: {
+        enabled: boolean,
+        roles: string[]                // ['CEO', 'CFO', 'CTO', 'Board Member']
+        // Note: Role names may vary by region/language
+      },
+      industryPeers: {
+        enabled: boolean,
+        sameSector: boolean,
+        sameRegion?: boolean           // Optional: limit to same geographic region
+      }
+    },
+    refreshInterval: {
+      entityGraph: number,              // Days between full refresh
+      relationships: number,            // Days between relationship updates
+      executives: number                // Days between executive list updates
+    }
+  },
+
+  queryGeneration: {
+    enabled: boolean,
+    strategies: {
+      news: {
+        baseQueries: string[],          // Template queries
+        queryVariants: number,          // How many variants to generate
+        includeSynonyms: boolean,
+        includeRelatedEntities: boolean,
+        maxQueriesPerSource: number
+      },
+      socialMedia: {
+        baseQueries: string[],
+        includeHashtags: boolean,
+        includeMentions: boolean,
+        includeTrending: boolean,
+        maxQueriesPerPlatform: number
+      },
+      web: {
+        baseQueries: string[],
+        includeLongTail: boolean,
+        maxQueries: number
+      }
+    },
+    aiGeneration: {
+      enabled: boolean,
+      model: string,                    // 'gpt-4'
+      temperature: number,              // 0.7
+      maxQueries: number,               // Per category
+      generationPrompt: string          // Template
+    },
+    queryOptimization: {
+      enabled: boolean,
+      minResultsThreshold: number,      // Queries with fewer results are optimized
+      maxResultsThreshold: number,      // Queries with too many results are narrowed
+      learningWindow: number            // Days of history to consider
+    }
+  },
+
+  keywordTracking: {
+    enabled: boolean,
+    sources: {
+      newsTrends: boolean,
+      socialTrends: boolean,
+      industryReports: boolean
+    },
+    trackingWindow: number,             // Days to track trends
+    minFrequency: number,                // Minimum mentions to track
+    aiAnalysis: {
+      enabled: boolean,
+      model: string,
+      analysisPrompt: string
+    }
+  },
+
+  queryOptimization: {
+    enabled: boolean,
+    metrics: {
+      relevanceScore: number,            // Weight for relevance
+      resultCount: number,               // Weight for result count
+      coverageScore: number              // Weight for topic coverage
+    },
+    optimizationFrequency: 'daily' | 'weekly' | 'monthly',
+    minDataPoints: number,              // Min queries to analyze before optimizing
+    aiOptimization: {
+      enabled: boolean,
+      model: string,
+      optimizationPrompt: string
+    }
+  },
+
+  ai: {
+    entityExtractionModel: 'gpt-4',
+    queryGenerationModel: 'gpt-4',
+    optimizationModel: 'gpt-4',
+    temperature: 0.7,
+    maxTokens: 2000
+  }
+}
+```
+
+## Outputs
+
+```typescript
+{
+  agentId: 'query-strategy',
+  agentVersion: string,                    // Semantic version (e.g., "1.2.3") of the agent that generated this output
+  identifier: {
+    type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
+    value: string
+  },
+  timestamp: Date,
+  executionTime: number,
+  entityGraph: {
+    identifier: {
+      type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
+      value: string
+    },
+    companyName: string,
+    entities: {
+      competitors: Array<{
+        identifier?: {
+          type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
+          value: string
+        },
+        companyName: string,
+        similarityScore: number,        // 0-1
+        relationshipStrength: 'strong' | 'medium' | 'weak',
+        lastUpdated: Date
+      }>,
+      suppliers: Array<{
+        name: string,
+        type: 'manufacturing' | 'software' | 'services' | 'other',
+        significance: 'high' | 'medium' | 'low',
+        lastUpdated: Date
+      }>,
+      customers: Array<{
+        name: string,
+        type: 'enterprise' | 'consumer' | 'government',
+        significance: 'high' | 'medium' | 'low',
+        lastUpdated: Date
+      }>,
+      executives: Array<{
+        name: string,
+        role: string,
+        tenure: number,                  // Years
+        publicProfile: boolean,
+        lastUpdated: Date
+      }>,
+      industryPeers: Array<{
+        identifier?: {
+          type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
+          value: string
+        },
+        companyName: string,
+        similarityFactors: string[],    // ['sector', 'revenue', 'industry']
+        lastUpdated: Date
+      }>
+    },
+    relationships: Array<{
+      from: string,                     // Entity ID
+      to: string,                       // Entity ID
+      type: 'competitor' | 'supplier' | 'customer' | 'partner' | 'executive',
+      strength: number,                  // 0-1
+      sources: string[],                 // Where relationship was discovered
+      lastUpdated: Date
+    }>,
+    metadata: {
+      graphVersion: number,
+      lastFullRefresh: Date,
+      entitiesCount: number,
+      relationshipsCount: number
+    }
+  },
+  queries: {
+    news: Array<{
+      id: string,
+      query: string,
+      source?: string,                   // Optional: suggested search source ID (e.g., 'serper-dev')
+      priority: 'high' | 'medium' | 'low',
+      expectedRelevance: number,         // 0-1
+      variants?: string[],               // Alternative phrasings
+      rationale: string                  // Why this query was generated
+    }>,
+    socialMedia: Array<{
+      id: string,
+      query: string,
+      platform: 'twitter' | 'reddit' | 'linkedin',
+      priority: 'high' | 'medium' | 'low',
+      queryType: 'company' | 'competitor' | 'executive' | 'trend' | 'event',
+      hashtags?: string[],
+      mentions?: string[],
+      expectedRelevance: number,
+      rationale: string
+    }>,
+    web: Array<{
+      id: string,
+      query: string,
+      searchEngine?: string,             // 'google', 'bing', etc.
+      priority: 'high' | 'medium' | 'low',
+      expectedRelevance: number,
+      rationale: string
+    }>
+  },
+  keywords: {
+    primary: string[],                   // Core keywords for this company/identifier
+    trending: Array<{
+      keyword: string,
+      trend: 'rising' | 'falling' | 'stable',
+      relevanceScore: number,
+      sources: string[],
+      firstSeen: Date,
+      lastSeen: Date
+    }>,
+    emerging: Array<{
+      keyword: string,
+      relevanceScore: number,
+      confidence: number,
+      sources: string[]
+    }>
+  },
+  recommendations: Array<{
+    type: 'query' | 'entity' | 'keyword',
+    action: string,
+    priority: 'high' | 'medium' | 'low',
+    rationale: string,
+    expectedImpact: number               // 0-1
+  }>,
+  metadata: {
+    queriesGenerated: number,
+    entitiesDiscovered: number,
+    entitiesUpdated: number,
+    keywordsTracked: number,
+    optimizationApplied: boolean
+  }
+}
+```
+
+## Scheduling
+
+The Query Strategy Agent runs **independently** on its own schedule (managed by Scheduler/Orchestrator):
+
+- Schedules are created by admins via the admin interface (stored in `Schedule` table)
+- Each schedule references a `JobTemplate` that defines the agent and parameters
+- Parameter expansion can be configured (e.g., expand to all tickers or active tickers)
+- Example schedules:
+  - **Entity Graph Refresh**: Weekly schedule with ticker expansion - Discovers and updates entity relationships
+  - **Query Optimization**: Daily schedule with ticker expansion - Analyzes previous day's query performance and optimizes strategies
+  - **Query Generation**: On-demand or event-driven - Generates new search queries
+- **Manual Trigger**: Can be triggered manually via API or admin interface
+
+**Note**: 
+- The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents.
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
+
+## Process (Step-by-Step)
+
+### **Initialization Phase**
+
+- Load agent configuration from database (hot-reloadable, no restart needed)
+- Check if entity graph exists for company identifier
+- Load previous query performance data from database (asynchronous feedback from Data Collection Agent)
+- Initialize AI clients
+- Determine regulatory filing sources based on market region
+
+### **Entity Graph Management**
+
+#### Entity Discovery
+
+This is run if the entity graph is not found or if the refresh interval has been reached.
+
+- Query the appropriate regulatory filing API based on market region (e.g., SEC EDGAR for US, Companies House for UK, SEDAR for Canada, ASX for Australia)
+- Extract entity mentions using AI (competitors, suppliers, customers)
+- Scrape the company website for executive information
+- Query the industry databases (if configured)
+- Use AI to extract and structure entities
+- Build/update the entity graph
+
+#### Relationship Extraction
+
+- Analyze the regulatory filings for relationship descriptions
+- Extract the relationship descriptions from the earnings call transcripts (if available for the region)
+- Use AI to identify the relationship types and strengths
+- Update the relationship graph
+
+### **Query Generation**
+
+#### Base Query Construction
+
+- Generate the base queries from the company identifier, company name, and industry
+- Include the entity-based queries (competitors, executives)
+- Consider the recent events and context
+- Generate the query variants (synonyms, phrasings)
+- Adapt queries to regional language and terminology if needed
+
+#### AI-Enhanced Query Generation
+
+- Use AI to generate the additional creative queries
+- Consider the trending topics and keywords
+- Generate the context-aware queries based on the time period
+- Create the queries for different sources/platforms
+
+#### Query Prioritization
+
+- Score the queries by the expected relevance
+- Prioritize the queries based on the entity importance
+- Consider the query performance history
+- Limit the queries per source (rate limiting)
+
+### **Keyword Tracking**
+
+- Analyze the recent news and social media for trending keywords
+- Identify the emerging keywords related to the company
+- Track the keyword evolution over time
+- Score the keywords by the relevance
+
+### **Query Optimization**
+
+This is run if previous results are available.
+
+- Analyze which the queries performed well
+- Identify the low-performing queries
+- Generate the optimized query variants
+- Update the query strategies
+
+### **Output Generation**
+
+- Structure the entity graph
+- Format the queries for each source/platform
+- Include the metadata and rationale
+- Generate the recommendations
+
+### **Storage**
+
+- Save the entity graph to the database (available for other agents to read independently)
+- Store the generated queries in the database (Data Collection Agent reads these asynchronously)
+- Update the query performance metrics (used by Learning Agent and future optimization cycles)
+- Log the optimization decisions
+- **No direct agent communication**: All outputs are persisted to the database; other agents read independently when they run
+
+## Sequence Diagram
+
+<Mermaid
+  chart="
+flowchart TD
+    A[Scheduler/Orchestrator<br/>or Manual Trigger] --> B[Query Strategy Agent<br/>Runs Independently<br/>Multiple instances can run in parallel]
+    B --> C[Agent receives identifier + context]
+    C --> D[Entity Graph Management]
+    
+    subgraph EntityGraph [Entity Graph Management]
+        direction TB
+        E1{Refresh needed?} -->|Yes| E2[Entity Discovery<br/>Query Regulatory APIs<br/>SEC, Companies House, etc.<br/>Scrape company website<br/>Query industry databases<br/>AI: Extract entities]
+        E1 -->|No| E3[Relationship Extraction<br/>Analyze filings/transcripts<br/>AI: Extract relationships<br/>Update entity graph]
+        E2 --> E3
+    end
+    
+    D --> EntityGraph
+    EntityGraph --> F[Query Generation]
+    
+    subgraph QueryGen [Query Generation]
+        direction TB
+        G1[Base Query Construction<br/>Generate from identifier/entities<br/>Include context events trends<br/>Create variants<br/>Adapt to regional language] --> G2[AI-Enhanced Generation<br/>AI: Generate creative queries<br/>Consider trending topics<br/>Platform-specific queries]
+        G2 --> G3[Query Prioritization<br/>Score by expected relevance<br/>Consider performance history<br/>Limit per source]
+    end
+    
+    F --> QueryGen
+    QueryGen --> H[Keyword Tracking parallel<br/>Analyze trends<br/>Identify emerging keywords]
+    H --> I{Previous results available?}
+    I -->|Yes| J[Query Optimization<br/>Analyze performance<br/>Generate optimized variants]
+    I -->|No| K[Write to Database<br/>Entity Graph + Queries + Keywords]
+    J --> K
+    K --> DB[(Database<br/>Shared Storage)]
+    DB -.->|Reads independently| DC[Data Collection Agent<br/>Runs on own schedule]
+    DB -.->|Reads feedback| B
+"
+/>

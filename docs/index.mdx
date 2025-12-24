@@ -22,8 +22,9 @@ This documentation is organized into the following sections:
 
 ### Agent Documentation
 
-The system consists of 8 specialized agents that work together:
+The system consists of **7 specialized agents** that work together, orchestrated by the **Scheduler/Orchestrator**:
 
+**Agents**:
 1. **[Query Strategy Agent](./agents/agent-query-strategy)** - Entity discovery, query generation, and optimization
 2. **[Data Collection Agent](./agents/agent-data-collection)** - Multi-source data collection with intelligent filtering
 3. **[Analysis Agent](./agents/agent-analysis)** - Sentiment, competitive, and event/context analysis
@@ -31,7 +32,9 @@ The system consists of 8 specialized agents that work together:
 5. **[Quality Assurance Agent](./agents/agent-quality-assurance)** - Content validation and compliance checking
 6. **[Delivery Agent](./agents/agent-delivery)** - Email and dashboard delivery with tracking
 7. **[Learning Agent](./agents/agent-learning)** - Metrics analysis, optimization, and A/B testing
-8. **[Scheduler Agent](./agents/agent-scheduler)** - Pipeline orchestration and job scheduling
+
+**Orchestrator** (core system component, not an agent):
+- **[Scheduler/Orchestrator](./agents/agent-scheduler)** - Pipeline orchestration, job scheduling, and agent instance management. The orchestrator is a core system component that coordinates agent execution but is not itself an agent.
 
 ### Plan Documentation
 
