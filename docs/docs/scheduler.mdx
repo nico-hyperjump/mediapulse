@@ -8,6 +8,8 @@ title: Scheduler/Orchestrator
 
 The orchestrator invokes agents via HTTP endpoints based on schedules stored in the database (cron, interval, or on-demand). Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The orchestrator does not wait for agent completion but tracks job status through the database.
 
+**Note**: The orchestrator interacts with the [Agent Registry API](./agent-registry-api) to discover available agent instances, monitor their health, and track capacity. The Agent Registry API is a separate service that agents use to register themselves and report their status. See [Agent Registry API Documentation](./agent-registry-api) for details.
+
 **Key Responsibilities**:
 - Dynamically discover agents from the database (no hardcoded agent list)
 - **Automatically spawn and manage agent instances** based on demand and load
@@ -65,86 +67,10 @@ interface SchedulerInput {
 The scheduler uses the following database tables (stored in PostgreSQL):
 
 ### `AgentRegistry`
-Stores **agent type metadata** (not version-specific). Agents register themselves here. See [Agent Specification](./agent-specification) for full registration details.
-
-```typescript
-{
-  id: string; // Agent ID (e.g., 'query-strategy', 'data-collection')
-  name: string; // Human-readable name
-  description: string;
-  version: string; // Current/latest version (informational only)
-  endpoint: {
-    type: 'http' | 'webhook' | 'n8n' | 'cloud-function';
-    url: string; // Full URL to agent endpoint
-    method: 'POST' | 'PUT';
-    authentication?: {
-      type: 'bearer' | 'api-key' | 'oauth';
-      token?: string;
-    };
-    timeout: number; // Request timeout in milliseconds
-    retryConfig?: {
-      maxRetries: number;
-      backoff: 'exponential' | 'linear' | 'fixed';
-      delay: number;
-    };
-  };
-  inputSchema: object; // JSON Schema or Zod schema (JSON representation)
-  outputSchema: object; // JSON Schema or Zod schema (JSON representation)
-  parameterTypes: {
-    // Defines what parameters this agent accepts and how they can be expanded
-    ticker?: {
-      required: boolean;
-      expandable: boolean; // If true, scheduler can expand this to multiple jobs
-      scope: 'all' | 'active' | 'custom'; // Default scope for expansion
-    };
-    userId?: {
-      required: boolean;
-      expandable: boolean;
-    };
-    // ... other parameter types
-  };
-  enabled: boolean;
-  healthCheck?: {
-    endpoint: string;
-    interval: number;
-  };
-  metadata?: {
-    language?: string; // Implementation language
-    runtime?: string; // Runtime environment
-    deployment?: string; // Deployment type
-  };
-  lastHeartbeat?: Date; // Last health check timestamp
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
+Stores **agent type metadata** (not version-specific). Agents register themselves via the [Agent Registry API](./agent-registry-api). See [Agent Registry API Documentation](./agent-registry-api#agentregistry) for the complete schema definition and [Agent Specification](./agent-specification) for full registration details.
 
 ### `AgentInstance`
-Stores running agent instances managed by the orchestrator. The orchestrator automatically creates, manages, and terminates instances. Multiple instances of the same agent version can exist for horizontal scaling. See [Agent Specification](./agent-specification) for instance lifecycle details.
-
-```typescript
-{
-  id: string; // Unique instance ID (e.g., 'data-collection-instance-1')
-  agentId: string; // Agent type (e.g., 'data-collection')
-  agentVersion: string; // Version this instance runs (e.g., '1.2.3')
-  endpoint: {
-    url: string; // Instance-specific endpoint URL
-    method: 'POST';
-    timeout: number;
-  };
-  status: 'active' | 'inactive' | 'unhealthy';
-  capacity: number; // Max concurrent jobs this instance can handle
-  currentLoad: number; // Current number of running jobs
-  lastHeartbeat: Date; // Last health check timestamp
-  metadata?: {
-    region?: string;
-    zone?: string;
-    deployment?: string; // 'container', 'lambda', etc.
-  };
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
+Stores running agent instances managed by the orchestrator. The orchestrator automatically creates, manages, and terminates instances. Multiple instances of the same agent version can exist for horizontal scaling. Instances register themselves and report status via the [Agent Registry API](./agent-registry-api). See [Agent Registry API Documentation](./agent-registry-api#agentinstance) for the complete schema definition and [Agent Specification](./agent-specification) for instance lifecycle details.
 
 ### `AgentVersionDeployment`
 Determines which version is active in production for each agent type. **Only one version per agentId can have `environment: 'production'`**.
@@ -463,6 +389,10 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
 
    - Query `AgentRegistry` table for all enabled agents (agent type metadata)
    - Query `AgentVersionDeployment` table to determine active production version for each agent
+   - **Interact with Agent Registry API**:
+     - Query Agent Registry API to discover available agent instances (or query `AgentInstance` table directly)
+     - Monitor instance health and availability through Agent Registry API
+     - Track instance capacity and current load for load balancing
    - **Initialize Instance Management**:
      - For each agent type, ensure minimum number of instances are running (from `minInstances` config)
      - Spawn initial instances if needed
@@ -478,7 +408,7 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
        - Average load below `scaleDownThreshold` for `scaleDownCooldown` period
        - Instance has been idle for `idleTimeout`
        - Must maintain at least `minInstances` per agent type
-   - Query `AgentInstance` table for all active instances of each agent version
+   - Query `AgentInstance` table for all active instances of each agent version (via Agent Registry API or direct database query)
    - Validate that agents referenced in schedules, job templates, and pipelines exist in registry
    - Verify agent instance endpoints are accessible (health checks)
    - Load agent input schemas to validate job parameters

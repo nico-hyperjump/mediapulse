@@ -2,7 +2,6 @@
   "title": "Agent Types",
   "defaultOpen": true,
   "pages": [
-    "agent-scheduler",
     "agent-query-strategy",
     "agent-data-collection",
     "analysis-agent",
