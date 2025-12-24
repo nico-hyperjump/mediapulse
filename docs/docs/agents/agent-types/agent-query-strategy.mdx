@@ -56,42 +56,19 @@ Dynamically discover entities, maintain entity relationships, generate intellige
 
 ```typescript
 interface QueryStrategyInput {
-  identifier: {
-    type: "ticker" | "isin" | "cusip" | "sedol" | "custom"; // Identifier type
-    value: string; // Identifier value (e.g., "AAPL", "US0378331005")
-  };
-  companyName: string; // Full company name
-  market?: {
-    region: string; // 'US', 'EU', 'UK', 'JP', 'CN', etc.
-    exchange?: string; // 'NYSE', 'NASDAQ', 'LSE', 'TSE', etc.
-    currency?: string; // 'USD', 'EUR', 'GBP', 'JPY', etc.
-  };
-  timeWindow: {
+  tickerId: number; // Required: Foreign key to the Ticker table
+  timeWindow?: {
     start: Date;
     end: Date;
-  };
-  context?: {
-    recentEvents?: string[]; // Recent significant events
-    earningsDate?: Date; // Upcoming or recent earnings (if applicable)
-    productLaunches?: Array<{ name: string; date: Date }>;
-  };
-  previousQueries?: Array<{
-    // For optimization
-    query: string;
-    source: string;
-    resultsCount: number;
-    relevanceScore: number;
-    timestamp: Date;
-  }>;
-  collectionResults?: {
-    // Feedback from Data Collection Agent
-    highRelevanceItems: number;
-    lowRelevanceItems: number;
-    missedTopics?: string[]; // Topics that should have been covered
-  };
-  refreshEntityGraph?: boolean; // Force entity graph refresh
+  }; // Optional: Time window for query generation
 }
 ```
+
+**Note**: The agent reads all necessary information from the database independently:
+- Company name, identifier, and market information are looked up from the `Ticker` table based on the `tickerId`
+- Previous query performance and collection results are read from the database (from `Query` and `DataSource` tables)
+- Recent events and context are determined by the agent based on the time window (if provided) and data in the database
+- The agent does not receive data from other agents as input parameters; all communication is via the database
 
 ## Configurations
 
@@ -194,12 +171,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       maxQueries: number,               // Per category
       generationPrompt: string          // Template
     },
-    queryOptimization: {
-      enabled: boolean,
-      minResultsThreshold: number,      // Queries with fewer results are optimized
-      maxResultsThreshold: number,      // Queries with too many results are narrowed
-      learningWindow: number            // Days of history to consider
-    }
   },
 
   keywordTracking: {
@@ -220,6 +191,9 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 
   queryOptimization: {
     enabled: boolean,
+    minResultsThreshold: number,         // Queries with fewer results are optimized
+    maxResultsThreshold: number,        // Queries with too many results are narrowed
+    learningWindow: number,              // Days of history to consider
     metrics: {
       relevanceScore: number,            // Weight for relevance
       resultCount: number,               // Weight for result count
@@ -250,6 +224,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 {
   agentId: 'query-strategy',
   agentVersion: string,                    // Semantic version (e.g., "1.2.3") of the agent that generated this output
+  executionId: string,                     // Execution ID from orchestrator
   identifier: {
     type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
     value: string
@@ -257,10 +232,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
   timestamp: Date,
   executionTime: number,
   entityGraph: {
-    identifier: {
-      type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
-      value: string
-    },
     companyName: string,
     entities: {
       competitors: Array<{
@@ -323,8 +294,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       query: string,
       source?: string,                   // Optional: suggested search source ID (e.g., 'serper-dev')
       priority: 'high' | 'medium' | 'low',
-      expectedRelevance: number,         // 0-1
-      variants?: string[],               // Alternative phrasings
       rationale: string                  // Why this query was generated
     }>,
     socialMedia: Array<{
@@ -335,7 +304,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       queryType: 'company' | 'competitor' | 'executive' | 'trend' | 'event',
       hashtags?: string[],
       mentions?: string[],
-      expectedRelevance: number,
       rationale: string
     }>,
     web: Array<{
@@ -343,7 +311,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       query: string,
       searchEngine?: string,             // 'google', 'bing', etc.
       priority: 'high' | 'medium' | 'low',
-      expectedRelevance: number,
       rationale: string
     }>
   },
@@ -364,13 +331,6 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
       sources: string[]
     }>
   },
-  recommendations: Array<{
-    type: 'query' | 'entity' | 'keyword',
-    action: string,
-    priority: 'high' | 'medium' | 'low',
-    rationale: string,
-    expectedImpact: number               // 0-1
-  }>,
   metadata: {
     queriesGenerated: number,
     entitiesDiscovered: number,
@@ -381,34 +341,20 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 }
 ```
 
-## Scheduling
-
-The Query Strategy Agent runs **independently** on its own schedule (managed by Scheduler/Orchestrator):
-
-- Schedules are created by admins via the admin interface (stored in `Schedule` table)
-- Each schedule references a `JobTemplate` that defines the agent and parameters
-- Parameter expansion can be configured (e.g., expand to all tickers or active tickers)
-- Example schedules:
-  - **Entity Graph Refresh**: Weekly schedule with ticker expansion - Discovers and updates entity relationships
-  - **Query Optimization**: Daily schedule with ticker expansion - Analyzes previous day's query performance and optimizes strategies
-  - **Query Generation**: On-demand or event-driven - Generates new search queries
-- **Manual Trigger**: Can be triggered manually via API or admin interface
-
-**Note**: 
-- The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents.
-- Multiple instances of the same agent version can run in parallel for horizontal scaling.
-- Only one version of this agent type can be active in production at a time.
-- The orchestrator distributes jobs across available agent instances using load balancing.
-
 ## Process (Step-by-Step)
 
 ### **Initialization Phase**
 
-- Load agent configuration from database (hot-reloadable, no restart needed)
-- Check if entity graph exists for company identifier
-- Load previous query performance data from database (asynchronous feedback from Data Collection Agent)
-- Initialize AI clients
-- Determine regulatory filing sources based on market region
+- Load agent configuration from database (`AgentConfig` table, key: `query-strategy`)
+- Look up company information from database (`Ticker` table) based on `tickerId`:
+  - Company name
+  - Market region, exchange, currency
+- Check if entity graph exists for company `tickerId` in database
+- Load previous query performance data from database:
+  - Query `Query` table for previous queries and their performance metrics
+  - Query `DataSource` table for collection results and relevance feedback
+- Initialize AI clients (models from config)
+- Determine regulatory filing sources based on market region from database
 
 ### **Entity Graph Management**
 
@@ -416,66 +362,86 @@ The Query Strategy Agent runs **independently** on its own schedule (managed by 
 
 This is run if the entity graph is not found or if the refresh interval has been reached.
 
-- Query the appropriate regulatory filing API based on market region (e.g., SEC EDGAR for US, Companies House for UK, SEDAR for Canada, ASX for Australia)
-- Extract entity mentions using AI (competitors, suppliers, customers)
-- Scrape the company website for executive information
-- Query the industry databases (if configured)
-- Use AI to extract and structure entities
-- Build/update the entity graph
+- Query regulatory filing APIs based on market region (configured in `entityDiscovery.sources.regulatoryFilings`):
+  - SEC EDGAR for US companies
+  - Companies House for UK companies
+  - SEDAR for Canadian companies
+  - ASX for Australian companies
+  - Other region-specific providers as configured
+- Extract entity mentions from filings using AI (model from `ai.entityExtractionModel`):
+  - Competitors mentioned in risk factors or competitive sections
+  - Suppliers and customers from business relationships
+  - Industry peers from market discussions
+- Scrape company website sections (configured in `entityDiscovery.sources.companyWebsite.sections`):
+  - Extract executive information from "About" or "Leadership" pages
+  - Extract partner information from "Partners" or "Customers" pages
+- Query industry databases (if `entityDiscovery.sources.industryDatabases.enabled`):
+  - Crunchbase, Pitchbook, or custom providers as configured
+- Use AI (model from `ai.entityExtractionModel`) to extract and structure entities from all sources
+- Build/update the entity graph in database
 
 #### Relationship Extraction
 
-- Analyze the regulatory filings for relationship descriptions
-- Extract the relationship descriptions from the earnings call transcripts (if available for the region)
-- Use AI to identify the relationship types and strengths
-- Update the relationship graph
+- Analyze regulatory filings for relationship descriptions:
+  - Risk factor sections for competitor mentions
+  - Business relationship sections for supplier/customer relationships
+  - Management discussion sections for industry context
+- Extract relationship descriptions from earnings call transcripts (if available for the region and configured)
+- Use AI (model from `ai.entityExtractionModel`) to identify relationship types and strengths
+- Update the relationship graph in database
 
 ### **Query Generation**
 
 #### Base Query Construction
 
-- Generate the base queries from the company identifier, company name, and industry
-- Include the entity-based queries (competitors, executives)
-- Consider the recent events and context
-- Generate the query variants (synonyms, phrasings)
-- Adapt queries to regional language and terminology if needed
+- Generate base queries from the company `tickerId`, company name (from database), and industry
+- Include entity-based queries (competitors, executives) from the entity graph
+- Determine recent events and context from the database (earnings dates, product launches, news from `DataSource` table)
+- Generate query variants (synonyms, phrasings) based on configuration
+- Adapt queries to regional language and terminology based on market region from database
 
 #### AI-Enhanced Query Generation
 
-- Use AI to generate the additional creative queries
-- Consider the trending topics and keywords
-- Generate the context-aware queries based on the time period
-- Create the queries for different sources/platforms
+- Use AI (model from `ai.queryGenerationModel`) to generate additional creative queries
+- Consider trending topics and keywords from keyword tracking
+- Generate context-aware queries based on the time period and recent events
+- Create platform-specific queries (news, social media, web) with appropriate formatting
 
 #### Query Prioritization
 
-- Score the queries by the expected relevance
-- Prioritize the queries based on the entity importance
-- Consider the query performance history
-- Limit the queries per source (rate limiting)
+- Score queries by expected relevance (based on entity importance, context, and performance history)
+- Prioritize queries based on entity importance and recent events (determined from database)
+- Consider query performance history from database (previous collection results from `DataSource` table)
+- Limit queries per source based on `queryGeneration.strategies.{category}.maxQueriesPerSource` configuration
 
 ### **Keyword Tracking**
 
-- Analyze the recent news and social media for trending keywords
-- Identify the emerging keywords related to the company
-- Track the keyword evolution over time
-- Score the keywords by the relevance
+This is run if `keywordTracking.enabled` is true.
+
+- Analyze recent news and social media for trending keywords (from configured sources in `keywordTracking.sources`)
+- Use AI (model from `keywordTracking.aiAnalysis.model`) to identify emerging keywords related to the company
+- Track keyword evolution over time (within `keywordTracking.trackingWindow`)
+- Score keywords by relevance to the company and identifier
+- Filter keywords by minimum frequency threshold (`keywordTracking.minFrequency`)
 
 ### **Query Optimization**
 
-This is run if previous results are available.
+This is run if previous results are available in the database and `queryOptimization.enabled` is true.
 
-- Analyze which the queries performed well
-- Identify the low-performing queries
-- Generate the optimized query variants
-- Update the query strategies
+- Query database for previous query performance:
+  - Read query performance metrics from `Query` table (linked to `DataSource` items)
+  - Analyze collection results from `DataSource` table (relevance scores, result counts)
+- Analyze query performance:
+  - Identify high-performing queries (high relevance scores, good result counts)
+  - Identify low-performing queries (below `minResultsThreshold` or above `maxResultsThreshold`)
+- Use AI (model from `ai.optimizationModel`) to generate optimized query variants for underperforming queries
+- Update query generation strategies based on optimization results
 
 ### **Output Generation**
 
 - Structure the entity graph
 - Format the queries for each source/platform
-- Include the metadata and rationale
-- Generate the recommendations
+- Include metadata and rationale for each query
 
 ### **Storage**
 
@@ -491,7 +457,8 @@ This is run if previous results are available.
   chart="
 flowchart TD
     A[Scheduler/Orchestrator<br/>or Manual Trigger] --> B[Query Strategy Agent<br/>Runs Independently<br/>Multiple instances can run in parallel]
-    B --> C[Agent receives identifier + context]
+    B --> C[Agent receives tickerId + optional timeWindow]
+    C --> C1[Look up company info from DB<br/>Load entity graph if exists<br/>Load previous query performance]
     C --> D[Entity Graph Management]
     
     subgraph EntityGraph [Entity Graph Management]
@@ -501,6 +468,7 @@ flowchart TD
         E2 --> E3
     end
     
+    C1 --> D
     D --> EntityGraph
     EntityGraph --> F[Query Generation]
     
@@ -512,12 +480,13 @@ flowchart TD
     
     F --> QueryGen
     QueryGen --> H[Keyword Tracking parallel<br/>Analyze trends<br/>Identify emerging keywords]
-    H --> I{Previous results available?}
-    I -->|Yes| J[Query Optimization<br/>Analyze performance<br/>Generate optimized variants]
+    H --> I{Previous results in DB?}
+    I -->|Yes| J[Query Optimization<br/>Read performance from DB<br/>Analyze & generate optimized variants]
     I -->|No| K[Write to Database<br/>Entity Graph + Queries + Keywords]
     J --> K
     K --> DB[(Database<br/>Shared Storage)]
-    DB -.->|Reads independently| DC[Data Collection Agent<br/>Runs on own schedule]
-    DB -.->|Reads feedback| B
+    DB -.->|Reads queries independently| DC[Data Collection Agent<br/>Runs on own schedule]
+    DB -.->|Writes feedback| DC
+    DB -.->|Reads feedback for optimization| B
 "
 />
