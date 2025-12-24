@@ -106,6 +106,7 @@ The output structure is generic and supports any registered analysis type:
 ```typescript
 {
   agentId: 'analysis',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   ticker: string,
   timestamp: Date,
   executionTime: number,

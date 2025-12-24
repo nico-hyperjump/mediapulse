@@ -161,6 +161,17 @@ The configuration hierarchy applies:
 
 **All configurations are stored in the database and loaded dynamically. No hardcoded values.**
 
+### Agent Output Versioning
+
+**All agent outputs include version information** for traceability and debugging. Every agent output contains an `agentVersion` field that specifies the semantic version (e.g., "1.2.3") of the agent that generated the output. This enables:
+
+- **Traceability**: Track which version of an agent generated specific outputs
+- **Debugging**: Identify version-specific issues by correlating outputs with agent versions
+- **Audit Trail**: Maintain a complete record of which agent version was responsible for each result
+- **Experimentation**: Compare outputs from different agent versions during A/B testing
+
+Agents read their active version from the `AgentVersionDeployment` table during initialization and include it in all outputs, including error outputs and partial results.
+
 ### Configuration Storage
 
 - **Database Tables**:

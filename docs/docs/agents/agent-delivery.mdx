@@ -67,6 +67,7 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 ```typescript
 {
   agentId: 'delivery',
+  agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   newsletterId: string,
   userId: string,
   timestamp: Date,

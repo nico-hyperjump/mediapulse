@@ -258,6 +258,8 @@ flowchart LR
 "
 />
 
+**Note**: All agent outputs written to the database include an `agentVersion` field that specifies the semantic version (e.g., "1.2.3") of the agent that generated the output. This enables traceability, debugging, and supports the agent versioning and experimentation system. Agents read their active version from the `AgentVersionDeployment` table during initialization and include it in all outputs.
+
 ## Key Design Principles
 
 ### 1. **Loose Coupling**

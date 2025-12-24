@@ -244,6 +244,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 ```typescript
 {
   agentId: 'query-strategy',
+  agentVersion: string,                    // Semantic version (e.g., "1.2.3") of the agent that generated this output
   identifier: {
     type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
     value: string
