@@ -118,11 +118,10 @@ Key entities:
 - `UserFeedback` - Ratings, clicks, engagement metrics
 - `AgentMetrics` - Performance tracking for self-improvement
 - `ABTest` - A/B testing configurations and results
-- `AgentVersion` - Agent version history and metadata
+- `AgentVersion` - Agent version history and metadata (configs include prompts embedded within them)
 - `AgentVersionDeployment` - Production deployment assignments (which version is active) - **Only one version per agentId can have `environment: 'production'`**
 - `AgentExperiment` - Experimental runs and version comparisons
 - `AgentValidation` - Validation checks before version promotion
-- `AgentPromptVersion` - Prompt template versioning
 - `AnalysisTypeRegistry` - Registered analysis types and their metadata
 
 ### Orchestrator Tables
@@ -348,9 +347,8 @@ Agents read their active version from the `AgentVersionDeployment` table during 
 
 - **Database Tables**:
 
-  - `AgentConfig` - Per-agent configurations (JSONB column with versioning) - Runtime configurations
-  - `AgentVersion` - Agent version snapshots (configs, prompts, metadata) - Historical versions for rollback
-  - `AgentPromptVersion` - Prompt template versions (separate from configs)
+  - `AgentConfig` - Per-agent configurations (JSONB column with versioning) - Runtime configurations (includes prompts embedded within config)
+  - `AgentVersion` - Agent version snapshots (configs include prompts embedded within them) - Historical versions for rollback
   - `SourceConfig` - Data source configurations (news sites, APIs, etc.)
   - `UserPreferences` - User-specific preferences
   - `SystemConfig` - Global system settings

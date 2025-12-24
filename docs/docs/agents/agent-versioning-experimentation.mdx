@@ -4,13 +4,13 @@ title: Versioning & Experimentation
 
 ## Purpose
 
-Enable project admins to safely experiment with agent configurations, prompts, and strategies without affecting production. Provides a complete workflow from experimental testing to production deployment with validation gates and confidence metrics.
+Enable project admins to safely experiment with agent configurations (which include prompts embedded within them) and strategies without affecting production. Provides a complete workflow from experimental testing to production deployment with validation gates and confidence metrics.
 
 ## Overview
 
 The agent versioning and experimentation system allows admins to:
 
-- Create experimental versions of agent configs and prompts
+- Create experimental versions of agent configs (which include prompts embedded within them)
 - Test changes in isolated environments
 - Compare experimental versions against production
 - Validate changes meet quality and performance thresholds
@@ -50,7 +50,7 @@ The `agentVersion` field is separate from `agentId` (which identifies the agent 
   agentId: string                    // Agent identifier (scheduler, query-strategy, etc.)
   version: string                     // Semantic version (e.g., "1.2.3")
   config: object                      // Agent configuration snapshot (JSONB) - from AgentConfig
-  prompts?: object                    // Prompt templates snapshot (JSONB) - from AgentPromptVersion
+                                     // Includes prompts embedded within the config (e.g., systemPrompt, extractionPrompt, etc.)
   codeHash: string                    // Hash of agent implementation code (for tracking code changes)
   createdAt: Date
   createdBy: string                   // 'learning-agent' | 'admin' | 'manual'
@@ -64,7 +64,7 @@ The `agentVersion` field is separate from `agentId` (which identifies the agent 
 }
 ```
 
-**Note**: `AgentVersion` stores snapshots of configurations and prompts, but does not replace `AgentConfig`. When a version is deployed:
+**Note**: `AgentVersion` stores snapshots of configurations (which include prompts embedded within them), but does not replace `AgentConfig`. When a version is deployed:
 1. `AgentConfig` is updated to match the version's configuration from `AgentVersion.config`
 2. Agents read from `AgentConfig` at runtime (this is the source of truth)
 3. The `AgentVersion` serves as a historical record and rollback point
@@ -151,27 +151,6 @@ The `agentVersion` field is separate from `agentId` (which identifies the agent 
 }
 ```
 
-**`AgentPromptVersion`** - Track prompt changes separately from config:
-
-```typescript
-{
-  id: string
-  agentId: string
-  promptName: string                   // e.g., 'analysis-prompt', 'content-generation-prompt'
-  version: string
-  prompt: string                       // The actual prompt template
-  config?: object                      // Associated config if any
-  status: 'draft' | 'experimental' | 'testing' | 'production'
-  createdAt: Date
-  createdBy: string
-  metadata: {
-    changes: string                    // What changed
-    rationale: string                  // Why the change was made
-    expectedImpact: string
-    testResults?: object
-  }
-}
-```
 
 ## Version Lifecycle
 
@@ -214,7 +193,7 @@ draft → experimental → testing → production
 - Only versions that pass validation can be deployed to production
 - **Deployment Process**:
   1. `AgentVersionDeployment` table is updated to mark the new version as active
-  2. `AgentConfig` table is updated to match the version's configuration from `AgentVersion.config`
+  2. `AgentConfig` table is updated to match the version's configuration from `AgentVersion.config` (includes prompts embedded within config)
   3. Agents read from `AgentConfig` at runtime (the source of truth)
   4. Agent instances reload configuration from database (hot-reload without restart, but may require agent re-initialization)
 - Previous production version automatically tracked for rollback
@@ -224,7 +203,7 @@ draft → experimental → testing → production
 
 - Instant rollback to previous production version
 - Updates `AgentVersionDeployment` table to point to previous version
-- Agent's `AgentConfig` is updated to match the previous version's configuration
+- Agent's `AgentConfig` is updated to match the previous version's configuration (includes prompts embedded within config)
 - Agents reload configuration from database (hot-reload)
 - No code deployment required (unless code was also changed)
 - Full audit trail maintained
@@ -241,8 +220,7 @@ draft → experimental → testing → production
 
 2. **Edit Configuration**:
 
-   - Admin edits agent config via admin dashboard
-   - Can edit prompts separately via prompt editor
+   - Admin edits agent config via admin dashboard (prompts are embedded within the config)
    - Changes saved to experimental version only
    - No impact on production
 
@@ -334,8 +312,7 @@ Before promoting to production, versions must pass validation gates:
 
 - **Version Browser**: View all versions for each agent
 - **Create Experimental**: Fork production version to experimental
-- **Config Editor**: Edit agent configurations in sandbox
-- **Prompt Editor**: Edit prompts with syntax highlighting and version control
+- **Config Editor**: Edit agent configurations in sandbox (includes prompts embedded within config)
 - **Test Runner**: Configure and run test executions
 - **Comparison Dashboard**: Side-by-side comparison of versions
 - **Validation Suite**: Run and view validation results
@@ -349,38 +326,30 @@ Before promoting to production, versions must pass validation gates:
 - **Override Controls**: Override warnings with approval workflow
 - **History**: View validation history for version
 
-### Prompt Management (`/admin/agents/prompts`)
-
-- **Prompt Library**: View all prompts for each agent
-- **Version Control**: Track prompt changes over time
-- **Test Prompts**: Test prompts with sample inputs
-- **Compare Outputs**: Side-by-side comparison of prompt outputs
-- **Promote Prompts**: Promote prompts independently of configs
 
 ### Version Comparison (`/admin/agents/versions/compare`)
 
 - **Side-by-Side View**: Compare any two versions
 - **Metrics Comparison**: Execution time, success rate, quality, cost
 - **Output Comparison**: Sample outputs from each version
-- **Diff View**: Configuration and prompt differences
+- **Diff View**: Configuration differences (prompts are embedded within config)
 - **Performance Charts**: Visual comparison of metrics over time
 
 ## Workflow Examples
 
 ### Example 1: Testing a New Prompt
 
-1. Admin navigates to `/admin/agents/prompts`
-2. Selects "Content Generation Agent" → "main-prompt"
-3. Creates experimental version of prompt
-4. Edits prompt with new instructions
+1. Admin navigates to `/admin/agents/experiments`
+2. Selects "Content Generation Agent"
+3. Creates experimental version from current production
+4. Edits prompt with new instructions via prompt editor
 5. Tests prompt with sample input
 6. Reviews output quality
-7. Creates experimental agent version that uses new prompt
-8. Runs test execution on sample newsletters
-9. Compares results with production version
-10. Runs validation suite
-11. If validations pass, promotes to testing (A/B test)
-12. After sufficient data, promotes to production
+7. Runs test execution on sample newsletters
+8. Compares results with production version
+9. Runs validation suite
+10. If validations pass, promotes to testing (A/B test)
+11. After sufficient data, promotes to production
 
 ### Example 2: Optimizing Agent Configuration
 
