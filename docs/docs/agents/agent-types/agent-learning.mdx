@@ -6,6 +6,11 @@ title: Learning Agent
 
 Collect metrics, analyze user feedback, optimize content generation, and manage A/B tests. The Learning Agent runs independently on an admin-configurable schedule (stored in `Schedule` table, example: daily at midnight) and creates optimized agent versions for admin review and deployment.
 
+**Note**: 
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
+
 ## Inputs
 
 - None (agent reads all data from database independently)

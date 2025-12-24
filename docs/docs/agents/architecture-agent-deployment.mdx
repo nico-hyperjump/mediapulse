@@ -195,53 +195,31 @@ WantedBy=multi-user.target
 
 ## Agent Registration
 
-All agents must register themselves in the `AgentRegistry` table. Registration happens on agent startup.
+**For complete registration details, see the [Agent Specification](./agent-specification.mdx#agent-registration) document.**
 
-### Registration Methods
+All agents must register themselves in the `AgentRegistry` table. The registration method depends on your deployment model:
 
-1. **Direct Database Connection**: Agent connects to PostgreSQL and inserts/updates record
-2. **Registration API**: Agent calls a registration API endpoint (if provided by the system)
-3. **Admin Interface**: Manual registration by admin (for external agents)
+- **Self-Registration**: Long-running services (containers, servers) register on startup
+- **Deployment-Time Registration**: Serverless functions register during CI/CD deployment
+- **Manual Registration**: External agents (n8n workflows) registered via admin interface
+- **Hybrid Registration**: Serverless functions that register on cold start
 
-### Registration Example (Python)
+### Deployment-Specific Registration
 
+**Container-Based**: Register in startup script or entrypoint
 ```python
-import psycopg2
-import json
-from datetime import datetime
-
-def register_agent():
-    conn = psycopg2.connect(os.getenv('DATABASE_URL'))
-    cur = conn.cursor()
-    
-    agent_data = {
-        'id': 'data-collection',
-        'name': 'Data Collection Agent',
-        'description': 'Collects raw media data from search sources',
-        'version': '1.0.0',
-        'endpoint': {
-            'type': 'http',
-            'url': os.getenv('AGENT_URL'),
-            'method': 'POST',
-            'timeout': 300000
-        },
-        'inputSchema': {...},
-        'outputSchema': {...},
-        'enabled': True
-    }
-    
-    cur.execute("""
-        INSERT INTO "AgentRegistry" (id, name, description, version, endpoint, "inputSchema", "outputSchema", enabled, "createdAt", "updatedAt")
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (id) DO UPDATE SET
-            endpoint = EXCLUDED.endpoint,
-            "updatedAt" = EXCLUDED."updatedAt"
-    """, (...))
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+# Called on container startup
+register_agent()
+start_server()
 ```
+
+**Serverless Functions**: Register during deployment (Terraform, CloudFormation, or CI/CD script)
+```bash
+# Run during deployment pipeline
+python register_agent.py
+```
+
+**n8n Workflows**: Register webhook URL via admin interface after workflow is created
 
 ## Agent Discovery
 

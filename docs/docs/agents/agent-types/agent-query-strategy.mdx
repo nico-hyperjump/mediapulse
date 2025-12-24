@@ -379,7 +379,7 @@ These are stored in the `AgentConfig` table, key: `query-strategy`
 
 ## Scheduling
 
-The Query Strategy Agent runs **independently** on its own schedule (managed by Scheduler Agent):
+The Query Strategy Agent runs **independently** on its own schedule (managed by Scheduler/Orchestrator):
 
 - Schedules are created by admins via the admin interface (stored in `Schedule` table)
 - Each schedule references a `JobTemplate` that defines the agent and parameters
@@ -390,7 +390,11 @@ The Query Strategy Agent runs **independently** on its own schedule (managed by 
   - **Query Generation**: On-demand or event-driven - Generates new search queries
 - **Manual Trigger**: Can be triggered manually via API or admin interface
 
-The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents. The agent runs as a BullMQ worker, picking up jobs from the queue when scheduled or manually triggered.
+**Note**: 
+- The agent's schedule is completely independent of other agents. It doesn't wait for or block other agents.
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
 
 ## Process (Step-by-Step)
 
@@ -482,7 +486,7 @@ This is run if previous results are available.
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler or Manual Trigger] --> B[Query Strategy Agent<br/>Runs Independently]
+    A[Scheduler/Orchestrator<br/>or Manual Trigger] --> B[Query Strategy Agent<br/>Runs Independently<br/>Multiple instances can run in parallel]
     B --> C[Agent receives identifier + context]
     C --> D[Entity Graph Management]
     

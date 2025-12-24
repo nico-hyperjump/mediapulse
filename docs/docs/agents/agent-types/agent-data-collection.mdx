@@ -344,7 +344,7 @@ interface DataCollectionInput {
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] -->|execute identifier, timeWindow, config| B[Data Collection Agent]
+    A[Scheduler/Orchestrator] -->|execute identifier, timeWindow, config<br/>Distributed to available instance| B[Data Collection Agent<br/>Multiple instances can run in parallel]
     B --> B1[1. Load config from DB]
     B1 --> B2[2. Validate inputs]
     B2 --> B3[3. Initialize rate limiters]
@@ -380,7 +380,7 @@ flowchart TD
     G1 --> G2[Link to query ID & identifier]
     G2 --> G3[Update source health]
     G3 --> H[Return Results<br/>Collected items<br/>Metadata<br/>Errors]
-    H --> I[Scheduler]
+    H --> I[Scheduler/Orchestrator]
     
     style C1 fill:#e1f5ff
     style SearchSources fill:#fff4e1

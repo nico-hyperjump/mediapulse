@@ -95,6 +95,23 @@ const RegulatoryAnalysisOutputSchema = z.object({
 
 ### Step 4: Implement the Plugin
 
+Create your analysis plugin implementation. **Plugin code must be located in the codebase**:
+
+**Recommended File Structure**:
+```
+apps/analysis-agent/src/plugins/
+  regulatory/
+    index.ts          # Plugin implementation (exports AnalysisPlugin)
+    schemas.ts        # Configuration and output schemas
+    utils.ts          # Helper functions (optional)
+```
+
+**Plugin Location Requirements**:
+- Plugins must be in the Analysis Agent codebase (not in database)
+- Recommended location: `plugins/{plugin-id}/index.ts`
+- Plugin must be registered in the plugin loader/registry (see `plugins/index.ts`)
+- Plugin ID in code must match the ID registered in `AnalysisTypeRegistry` table
+
 Create your analysis plugin implementation:
 
 ```typescript

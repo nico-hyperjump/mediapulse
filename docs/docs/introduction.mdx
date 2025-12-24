@@ -42,6 +42,9 @@ A modular multi-agent system built with Next.js (App Router), TypeScript, Python
 
 ### Core Components
 
+The system consists of **7 specialized agents** and **1 orchestrator component**:
+
+**Agents** (7 types):
 1. **Query Strategy Agent** - Maintains entity relationships, generates dynamic search queries, detects trends, and learns from successful content
 2. **Data Collection Agent** - Uses queries from Query Strategy Agent to collect data from news sites, social media, and public media sources
 3. **Analysis Agent** - Performs analysis using a plugin-based system. By default includes sentiment analysis, competitive landscape research, and event/context analysis. New analysis types can be added by implementing plugin code and registering metadata in the database
@@ -49,7 +52,9 @@ A modular multi-agent system built with Next.js (App Router), TypeScript, Python
 5. **Quality Assurance Agent** - Validates content quality, fact-checks, and ensures compliance
 6. **Delivery Agent** - Handles email delivery and web dashboard updates
 7. **Learning Agent** - Tracks metrics, learns from user feedback, optimizes content generation, and creates new agent versions with improvements
-8. **Scheduler Agent** - Manages periodic tasks and job orchestration
+
+**Orchestrator** (core system component, not an agent):
+- **Scheduler/Orchestrator** - Manages periodic tasks, job orchestration, and agent instance lifecycle. The orchestrator is a core system component that schedules and coordinates agent execution, but is not itself an agent. See [Architecture](./architecture) for details.
 
 ## Technical Stack
 

@@ -2,6 +2,11 @@
 title: Analysis Agent
 ---
 
+**Note**: 
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
+
 ## Purpose
 
 Analyze collected media data to generate insights using a plugin-based architecture. The agent dynamically loads and executes registered analysis types, allowing for easy addition, removal, or modification of analysis capabilities without code changes.
@@ -225,7 +230,7 @@ The output structure is generic and supports any registered analysis type:
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] --> B[Analysis Agent<br/>Triggered independently]
+    A[Scheduler/Orchestrator] --> B[Analysis Agent<br/>Triggered independently<br/>Multiple instances can run in parallel]
     B --> B1[Load config from Database]
     B1 --> B2[Query AnalysisTypeRegistry<br/>for enabled plugins]
     B2 --> C[Agent reads collected data<br/>from Database]

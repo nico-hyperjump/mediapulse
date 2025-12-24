@@ -1,21 +1,28 @@
 ---
-title: Scheduler Agent
+title: Scheduler/Orchestrator
 ---
 
 ## Purpose
 
-Orchestrate and schedule all agents in the system by managing periodic tasks, pipeline workflows, and job dependencies. The scheduler is **completely generic** and **database-driven**—it has no hardcoded agent configurations. Admins create schedules, job templates, and pipelines through the admin interface, and the scheduler dynamically discovers agents and executes jobs based on database configurations.
+**The Scheduler/Orchestrator is NOT an agent** - it is a core system component that orchestrates and schedules all agents in the system by managing periodic tasks, pipeline workflows, and job dependencies. The orchestrator is **completely generic** and **database-driven**—it has no hardcoded agent configurations. Admins create schedules, job templates, and pipelines through the admin interface, and the orchestrator dynamically discovers agents and executes jobs based on database configurations.
 
-The scheduler invokes agents via HTTP endpoints based on schedules stored in the database (cron, interval, or on-demand). Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The scheduler does not wait for agent completion but tracks job status through the database.
+The orchestrator invokes agents via HTTP endpoints based on schedules stored in the database (cron, interval, or on-demand). Agents are **language-agnostic** and can run anywhere (containers, cloud functions, n8n workflows, etc.) as long as they follow the [Agent Specification](./agent-specification). Agents execute asynchronously, reading from and writing to the database. The orchestrator does not wait for agent completion but tracks job status through the database.
 
 **Key Responsibilities**:
 - Dynamically discover agents from the database (no hardcoded agent list)
+- **Automatically spawn and manage agent instances** based on demand and load
+- **Scale instances up/down automatically** (create new instances when needed, terminate idle ones)
+- **Monitor job queue** and spawn instances proactively when queue grows
+- Distribute jobs across available instances using load balancing
 - Execute schedules created by admins (stored in `Schedule` table)
 - Expand job templates with parameter expansion (e.g., one schedule → many jobs for many tickers)
+- Divide large jobs into smaller sub-jobs when needed (e.g., 100 keywords → 10 jobs of 10 keywords)
 - Orchestrate multi-agent pipelines with job dependencies (stored in `Pipeline` table)
 - Manage different schedule types: cron expressions, intervals, and on-demand triggers
 - Invoke agent HTTP endpoints with proper parameters and authentication
+- Select appropriate agent instances based on capacity and load
 - Monitor job status through database queries (`AgentJobExecution` table)
+- Monitor instance health and automatically replace failed instances
 - Handle retries for failed jobs by re-invoking agent endpoints
 - Support manual triggers via API or admin interface
 - Validate agent responses and handle agent failures gracefully
@@ -58,14 +65,14 @@ interface SchedulerInput {
 The scheduler uses the following database tables (stored in PostgreSQL):
 
 ### `AgentRegistry`
-Stores metadata about all available agents in the system. Agents register themselves here. See [Agent Specification](./agent-specification) for full registration details.
+Stores **agent type metadata** (not version-specific). Agents register themselves here. See [Agent Specification](./agent-specification) for full registration details.
 
 ```typescript
 {
   id: string; // Agent ID (e.g., 'query-strategy', 'data-collection')
   name: string; // Human-readable name
   description: string;
-  version: string;
+  version: string; // Current/latest version (informational only)
   endpoint: {
     type: 'http' | 'webhook' | 'n8n' | 'cloud-function';
     url: string; // Full URL to agent endpoint
@@ -109,6 +116,46 @@ Stores metadata about all available agents in the system. Agents register themse
   lastHeartbeat?: Date; // Last health check timestamp
   createdAt: Date;
   updatedAt: Date;
+}
+```
+
+### `AgentInstance`
+Stores running agent instances managed by the orchestrator. The orchestrator automatically creates, manages, and terminates instances. Multiple instances of the same agent version can exist for horizontal scaling. See [Agent Specification](./agent-specification) for instance lifecycle details.
+
+```typescript
+{
+  id: string; // Unique instance ID (e.g., 'data-collection-instance-1')
+  agentId: string; // Agent type (e.g., 'data-collection')
+  agentVersion: string; // Version this instance runs (e.g., '1.2.3')
+  endpoint: {
+    url: string; // Instance-specific endpoint URL
+    method: 'POST';
+    timeout: number;
+  };
+  status: 'active' | 'inactive' | 'unhealthy';
+  capacity: number; // Max concurrent jobs this instance can handle
+  currentLoad: number; // Current number of running jobs
+  lastHeartbeat: Date; // Last health check timestamp
+  metadata?: {
+    region?: string;
+    zone?: string;
+    deployment?: string; // 'container', 'lambda', etc.
+  };
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### `AgentVersionDeployment`
+Determines which version is active in production for each agent type. **Only one version per agentId can have `environment: 'production'`**.
+
+```typescript
+{
+  agentId: string; // Agent type (e.g., 'data-collection')
+  version: string; // Semantic version (e.g., '1.2.3')
+  environment: 'production' | 'staging' | 'development';
+  deployedAt: Date;
+  deployedBy: string; // Admin user ID
 }
 ```
 
@@ -236,7 +283,7 @@ Tracks schedule execution history.
 
 ## Configurations
 
-This is the minimal configuration for the scheduler agent. It is stored in the `AgentConfig` table, key: `scheduler`.
+This is the minimal configuration for the orchestrator. It is stored in the `AgentConfig` table, key: `scheduler`.
 
 ```typescript
 {
@@ -245,6 +292,45 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
     enabled: true,
     timezone: 'America/New_York', // Default timezone for schedules
     checkInterval: 60000 // How often to check for due schedules (ms)
+  },
+  
+  // Instance management settings
+  instanceManagement: {
+    enabled: true,
+    autoScaling: {
+      enabled: true,
+      minInstances: {
+        [agentId: string]: number // Min instances per agent type (default: 1)
+      },
+      maxInstances: {
+        [agentId: string]: number // Max instances per agent type (default: 10)
+      },
+      scaleUpThreshold: 0.8, // Spawn new instance when average load > 80%
+      scaleDownThreshold: 0.2, // Terminate instance when average load < 20%
+      scaleUpCooldown: 300000, // Wait 5 minutes before scaling up again
+      scaleDownCooldown: 600000, // Wait 10 minutes before scaling down again
+      idleTimeout: 1800000, // Terminate idle instances after 30 minutes
+      queueBasedScaling: {
+        enabled: true,
+        pendingJobsThreshold: 10, // Spawn instance if pending jobs > threshold
+        jobsPerInstance: 5 // Target jobs per instance
+      }
+    },
+    instanceConfig: {
+      defaultCapacity: 10, // Default max concurrent jobs per instance
+      healthCheckInterval: 30000, // Check instance health every 30 seconds
+      heartbeatTimeout: 120000, // Consider instance dead if no heartbeat for 2 minutes
+      spawnTimeout: 60000, // Timeout for spawning new instance (60 seconds)
+    },
+    deployment: {
+      type: 'container' | 'lambda' | 'cloud-run' | 'kubernetes', // How to spawn instances
+      config: {
+        // Deployment-specific configuration
+        // For containers: image, resources, etc.
+        // For Lambda: function config, etc.
+        // For Kubernetes: deployment spec, etc.
+      }
+    }
   },
   
   // HTTP client configuration for agent invocations
@@ -278,13 +364,13 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 }
 ```
 
-**Note**: All agent-specific schedules, job templates, and pipelines are stored in the database tables above, not in the scheduler configuration. The scheduler dynamically loads and executes them.
+**Note**: All agent-specific schedules, job templates, and pipelines are stored in the database tables above, not in the orchestrator configuration. The orchestrator dynamically loads and executes them.
 
 ## Outputs
 
 ```typescript
 {
-  agentId: 'scheduler',
+  agentId: 'orchestrator', // Note: Orchestrator is not an agent, but uses this format for consistency
   agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
   executionId: string,
   timestamp: Date,
@@ -356,12 +442,12 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 }
 ```
 
-**Note**: The scheduler returns orchestration results immediately after invoking agent endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agents update their job status in the database as they execute independently.
+**Note**: The orchestrator returns orchestration results immediately after invoking agent instance endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agent instances update their job status in the database as they execute independently.
 
 ## Process
 
 1. **Initialize**: 
-   - Load scheduler config from database (`AgentConfig` table, key: `scheduler`)
+   - Load orchestrator config from database (`AgentConfig` table, key: `scheduler`)
    - Load all enabled schedules from `Schedule` table
    - Load all enabled job templates from `JobTemplate` table
    - Load all enabled pipelines from `Pipeline` table
@@ -373,18 +459,36 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
    - Initialize ticker/identifier cache (optional, for performance when processing many tickers)
    - Initialize HTTP client pool for agent invocations
 
-2. **Agent Discovery**:
+2. **Agent Discovery & Instance Management**:
 
-   - Query `AgentRegistry` table for all enabled agents
+   - Query `AgentRegistry` table for all enabled agents (agent type metadata)
+   - Query `AgentVersionDeployment` table to determine active production version for each agent
+   - **Initialize Instance Management**:
+     - For each agent type, ensure minimum number of instances are running (from `minInstances` config)
+     - Spawn initial instances if needed
+     - Start instance health monitoring loop
+   - **Monitor Job Queue & Load**:
+     - Continuously monitor pending jobs in `AgentJobExecution` table
+     - Track average load across all instances per agent type
+     - Spawn new instances when:
+       - Average load exceeds `scaleUpThreshold`
+       - Pending jobs exceed `pendingJobsThreshold`
+       - No available instances with capacity
+     - Terminate idle instances when:
+       - Average load below `scaleDownThreshold` for `scaleDownCooldown` period
+       - Instance has been idle for `idleTimeout`
+       - Must maintain at least `minInstances` per agent type
+   - Query `AgentInstance` table for all active instances of each agent version
    - Validate that agents referenced in schedules, job templates, and pipelines exist in registry
-   - Verify agent endpoints are accessible (health checks)
+   - Verify agent instance endpoints are accessible (health checks)
    - Load agent input schemas to validate job parameters
    - Cache agent metadata (endpoints, authentication, timeouts) for performance
-   - Monitor agent heartbeats and mark agents as unavailable if heartbeat is stale
+   - Monitor instance heartbeats and automatically replace instances if heartbeat is stale
+   - Track instance capacity and current load for load balancing
 
 3. **Schedule Execution** (triggered by cron, interval, manual, or event):
 
-   The scheduler handles different types of schedules from the database:
+   The orchestrator handles different types of schedules from the database:
 
    **3a. Cron-based Schedules**:
    - Monitor all cron expressions from `Schedule` table where `type = 'cron'` and `enabled = true`
@@ -405,7 +509,7 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 
 4. **Parameter Expansion** (for agents that require expansion):
 
-   The scheduler expands parameters based on `expansionConfig` in schedules or `expansionParams` in triggers:
+   The orchestrator expands parameters based on `expansionConfig` in schedules or `expansionParams` in triggers:
 
    **4a. Ticker Expansion**:
    - If `expandTickers` is configured:
@@ -447,19 +551,49 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
    - If user expansion needed: Expand to multiple users (see 4b)
    - If both: Expand to user-ticker combinations (see 4c)
 
-   **5c. Invoke Agents**:
-   - For each expanded parameter set (or single set if no expansion):
-     - Generate unique `jobId` and `executionId`
-     - Create execution record in `AgentJobExecution` table with `status: 'pending'`
-     - Build execution request with merged parameters (template defaults + trigger params + expanded params)
-     - Validate parameters against agent's `inputSchema`
-     - Invoke agent HTTP endpoint (POST to `AgentRegistry.endpoint.url`)
-       - Include authentication headers if configured
-       - Set timeout from agent endpoint config or template
-       - Include `X-Job-Id` and `X-Execution-Id` headers
-     - Handle agent response:
-       - If `status: 'accepted'`: Job is queued for execution by agent
-       - If `status: 'rejected'`: Mark execution as failed, log error
+   **5c. Job Division** (if needed):
+   - Check if job parameters indicate a large job that should be divided (e.g., 100 keywords)
+   - If job division is configured for the agent:
+     - Divide large parameter sets into smaller sub-jobs (e.g., 100 keywords → 10 jobs of 10 keywords)
+     - Create separate execution records for each sub-job
+     - Link sub-jobs to parent job via `metadata.parentJobId`
+     - Each sub-job gets its own `jobId` and `executionId`
+   
+   **5d. Instance Selection & Job Distribution**:
+   - For each job (or sub-job):
+     - **Check Available Capacity**:
+       - Query `AgentInstance` table for active instances of the agent's production version
+       - Filter instances by:
+         - `status: 'active'`
+         - Recent `lastHeartbeat` (e.g., within last 2 minutes)
+         - Available capacity (`currentLoad < capacity`)
+       - Calculate total available capacity across all instances
+     - **Auto-Scale if Needed**:
+       - If no instances available or total capacity insufficient:
+         - Check if can spawn new instance (within `maxInstances` limit)
+         - Spawn new instance if allowed
+         - Wait for instance to become ready (status: 'active')
+       - If pending jobs exceed threshold and average load is high:
+         - Spawn additional instances (respecting `maxInstances` and cooldown)
+     - **Select Instance**:
+       - Select instance using load balancing algorithm:
+         - **Least-loaded**: Instance with lowest `currentLoad / capacity` ratio
+         - **Round-robin**: Rotate through available instances
+         - **Random**: Randomly select from available instances
+     - **Distribute Job**:
+       - Update selected instance's `currentLoad` (increment by 1)
+       - Generate unique `jobId` and `executionId`
+       - Create execution record in `AgentJobExecution` table with `status: 'pending'`
+       - Build execution request with merged parameters (template defaults + trigger params + expanded params)
+       - Validate parameters against agent's `inputSchema`
+       - Invoke agent instance HTTP endpoint (POST to `AgentInstance.endpoint.url`)
+         - Include authentication headers if configured
+         - Set timeout from agent endpoint config or template
+         - Include `X-Job-Id` and `X-Execution-Id` headers
+         - Include `instanceId` in request body for load tracking
+       - Handle agent response:
+         - If `status: 'accepted'`: Job is queued for execution by agent instance
+         - If `status: 'rejected'`: Mark execution as failed, decrement instance load, log error
      - Apply stagger delays between batches (if configured)
    - Track job creation in `ScheduleExecution` table
 
@@ -501,14 +635,16 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 
 7. **Agent Execution**:
 
-   - Scheduler invokes agent HTTP endpoints asynchronously
-   - Agents accept jobs immediately and return `status: 'accepted'`
-   - Agents execute work asynchronously and update `AgentJobExecution` table
+   - Orchestrator invokes agent instance HTTP endpoints asynchronously
+   - Agent instances accept jobs immediately and return `status: 'accepted'`
+   - Agent instances execute work asynchronously and update `AgentJobExecution` table
+   - Agent instances update their `currentLoad` when jobs start/complete
    - Agents do not receive data from other agents
    - Agents read from and write to database independently
    - No direct agent-to-agent communication
    - All coordination through database state
-   - Scheduler monitors agent execution by querying `AgentJobExecution` table
+   - Orchestrator monitors agent execution by querying `AgentJobExecution` table
+   - Orchestrator monitors instance health by querying `AgentInstance` table
 
 8. **Job Dependencies & Status Tracking**:
 
@@ -517,28 +653,42 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
    - Monitor job progress by querying `AgentJobExecution` table periodically
    - Handle failed jobs with retry logic:
      - Check `AgentJobExecution.error.retryable` flag
-     - If retryable and retry count < max: Re-invoke agent endpoint after backoff delay
-     - If not retryable: Mark as permanently failed, notify admins
+     - If retryable and retry count < max: 
+       - Select a different instance (if original instance is unhealthy) or same instance
+       - Re-invoke agent instance endpoint after backoff delay
+       - Update instance load accordingly
+     - If not retryable: Mark as permanently failed, decrement instance load, notify admins
+   - When jobs complete: Decrement instance `currentLoad` in `AgentInstance` table
    - Use exponential backoff from template/schedule config for retries
 
-9. **Parallelization**:
+9. **Parallelization & Job Division**:
 
    - **Expanded Parameter Jobs** (e.g., per-ticker, per-user):
      - Multiple expanded items processed in parallel (controlled by `batchSize` in expansion config)
-     - Scheduler invokes multiple agent endpoints concurrently (up to `batchSize`)
-     - Example: 100 tickers with `batchSize: 20` = 5 batches, each batch invokes 20 agent endpoints in parallel
+     - Orchestrator invokes multiple agent instance endpoints concurrently (up to `batchSize`)
+     - Example: 100 tickers with `batchSize: 20` = 5 batches, each batch invokes 20 agent instance endpoints in parallel
      - Stagger delays between batches prevent rate limiting and resource exhaustion
-     - Agents execute work asynchronously after accepting jobs
+     - Agent instances execute work asynchronously after accepting jobs
+   
+   - **Job Division** (for large parameter sets):
+     - When a job has a large parameter set (e.g., 100 keywords), the orchestrator can divide it into smaller sub-jobs
+     - Example: Job with 100 keywords → 10 sub-jobs of 10 keywords each
+     - Each sub-job is distributed to an available agent instance
+     - Sub-jobs can run in parallel across multiple instances
+     - Parent job relationship is tracked via `metadata.parentJobId`
+     - Results from sub-jobs can be aggregated if needed
    
    - **Single Parameter Jobs** (no expansion):
      - Single job processes all data in aggregate
      - Can run concurrently with other agent jobs
+     - Distributed to an available instance based on load balancing
    
    - **Pipeline Steps**:
      - Steps with `parallel: true` can run concurrently
      - Steps with `dependsOn` run sequentially after dependencies complete
      - Multiple parameter expansions (e.g., user-ticker pairs) can be processed in parallel
      - Example: Newsletter pipeline with 10 users × 5 tickers = 50 parallel pipeline executions
+     - Each execution distributed across available agent instances
 
 10. **Scalability Considerations**:
 
@@ -562,16 +712,23 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
 
 11. **Error Handling**:
 
-   - **Agent Invocation Errors** (network, timeout, agent unavailable):
+   - **Agent Instance Invocation Errors** (network, timeout, instance unavailable):
      - Retry with exponential backoff (configured in `JobTemplate` or `Schedule`)
-     - Mark agent as unavailable if health check fails
+     - Mark instance as `'unhealthy'` if health check fails or multiple failures occur
+     - Select alternative instance if original instance is unavailable
      - Log errors to database for monitoring (`ScheduleExecution` table)
+     - Decrement instance load on failure
    
    - **Agent Execution Errors** (agent rejects job or fails during execution):
-     - Agent updates `AgentJobExecution.status: 'failed'` with error details
-     - Scheduler checks `error.retryable` flag
-     - If retryable: Re-invoke agent endpoint after backoff delay
-     - If not retryable: Mark as permanently failed, notify admins
+     - Agent instance updates `AgentJobExecution.status: 'failed'` with error details
+     - Orchestrator checks `error.retryable` flag
+     - If retryable: Re-invoke agent instance endpoint (same or different instance) after backoff delay
+     - If not retryable: Mark as permanently failed, decrement instance load, notify admins
+   
+   - **Instance Failures**:
+     - Instances with stale heartbeats are automatically excluded from job distribution
+     - Jobs in progress on failed instances are retried on other instances
+     - Instance health is monitored continuously
    
    - **Pipeline Dependencies**:
      - Job dependencies can timeout if upstream jobs fail repeatedly
@@ -582,18 +739,53 @@ This is the minimal configuration for the scheduler agent. It is stored in the `
      - Failed jobs for one schedule/template don't block others
      - Agents can implement their own retry logic internally
 
-12. **Metrics Collection**:
+12. **Instance Management** (Automatic):
+
+   - **Instance Spawning**:
+     - Automatically spawn new instances when:
+       - Job queue has pending jobs and no available capacity
+       - Average instance load exceeds `scaleUpThreshold`
+       - Pending jobs exceed `pendingJobsThreshold`
+     - **Spawning Mechanism** (varies by deployment type):
+       - **Containers**: Orchestrator calls container orchestration API (Docker API, Kubernetes API, etc.) to create new container instances. Container image is determined by agent type and version. Instance endpoint URL is assigned based on container networking (e.g., `http://agent-instance-{id}:{port}`).
+       - **Lambda/Cloud Functions**: Orchestrator invokes function deployment API to create new function instances. Instance endpoint URL is the function's invocation URL. Note: Serverless functions may have cold starts.
+       - **Kubernetes**: Orchestrator creates new Pod replicas via Kubernetes API. Instance endpoint URL is the Service endpoint for the pod.
+       - **Cloud Run/ECS**: Orchestrator creates new task/service instances via cloud provider API. Instance endpoint URL is assigned by the cloud platform.
+     - Create instance record in `AgentInstance` table with:
+       - Unique instance ID (generated by orchestrator, e.g., `{agentId}-instance-{timestamp}-{random}`)
+       - Agent type and active version (from `AgentVersionDeployment`)
+       - Instance endpoint URL (assigned by orchestrator based on deployment type and networking)
+       - Initial status: `'spawning'` → `'active'` when ready (instance reports ready via health check)
+       - Capacity from config (default or agent-specific)
+     - **Instance Discovery**: New instances register themselves in `AgentInstance` table when they start, or orchestrator creates the record during spawning
+   - **Instance Health Monitoring**:
+     - Continuously monitor instance heartbeats (query `AgentInstance.lastHeartbeat`)
+     - Mark instances as `'unhealthy'` if heartbeat is stale (exceeds `heartbeatTimeout`)
+     - Automatically spawn replacement instances for failed/unhealthy instances
+     - Terminate and remove failed instance records
+   - **Auto-Scaling**:
+     - **Scale Up**: Spawn new instances when load is high (respecting `maxInstances` limit)
+     - **Scale Down**: Terminate idle instances when load is low (respecting `minInstances` limit)
+     - Apply cooldown periods to prevent rapid scaling oscillations
+     - Terminate instances that have been idle for `idleTimeout`
+   - **Load Balancing**: Distribute jobs based on instance capacity and current load
+   - **Failover**: Automatically route jobs to healthy instances when others fail
+   - **Capacity Tracking**: Update instance `currentLoad` as jobs start and complete
+   - **Instance Lifecycle**: Fully manage instance lifecycle (spawn → active → idle → terminate)
+
+13. **Metrics Collection**:
 
    - Agents write metrics to database upon completion
-   - Scheduler queries database for job and pipeline status
+   - Orchestrator queries database for job and pipeline status
    - Track schedule execution history in `ScheduleExecution` table
+   - Track instance performance and utilization
    - Learning Agent reads metrics from database independently (runs on its own schedule)
 
-13. **Return**: Orchestration results (job IDs, status, metadata for all scheduled agents, including expanded parameter counts)
+14. **Return**: Orchestration results (job IDs, status, metadata for all scheduled agents, including expanded parameter counts and instance assignments)
 
 ## Admin Interface Usage
 
-Admins can create and manage schedules, job templates, and pipelines through the admin interface. The scheduler dynamically loads and executes these configurations without any code changes.
+Admins can create and manage schedules, job templates, and pipelines through the admin interface. The orchestrator dynamically loads and executes these configurations without any code changes.
 
 ### Creating a Schedule
 
@@ -634,7 +826,7 @@ Admins can create and manage schedules, job templates, and pipelines through the
 
 3. **Create a Schedule for the Pipeline**:
    - Create a schedule that references the pipeline (instead of a single job template)
-   - The scheduler will execute the pipeline when the schedule triggers
+     - The orchestrator will execute the pipeline when the schedule triggers
 
 ### Example: Query Strategy Agent Schedule
 
@@ -651,7 +843,7 @@ Admins can create and manage schedules, job templates, and pipelines through the
 - `jobTemplateId`: "query-strategy-entity-graph"
 - `expansionConfig.expandTickers`: `{ scope: "all", batchSize: 10, staggerDelay: 1000 }`
 
-**Result**: Every Sunday at 2 AM, the scheduler expands to all tickers and creates 100 jobs (one per ticker) that process in batches of 10.
+**Result**: Every Sunday at 2 AM, the orchestrator expands to all tickers and creates 100 jobs (one per ticker) that are distributed across available agent instances in batches of 10.
 
 ## Sequence Diagram
 
@@ -675,7 +867,7 @@ flowchart TD
         T4[Event Trigger<br/>e.g., entity graph updated]
     end
     
-    DB1 --> S[Scheduler Agent<br/>Loads from DB]
+    DB1 --> S[Scheduler/Orchestrator<br/>Loads from DB]
     DB2 --> S
     DB3 --> S
     DB4[(AgentRegistry<br/>Table)] --> S
@@ -714,14 +906,15 @@ flowchart TD
     S16 --> S17[Invoke Agents for Each Step<br/>with Dependencies]
     S17 --> S11
     
-    S11 --> AG1[Agent HTTP Endpoints<br/>POST /execute]
+    S11 --> S20[Select Agent Instance<br/>Based on Load Balancing]
+    S20 --> AG1[Agent Instance HTTP Endpoints<br/>POST /execute]
     
-    subgraph Agents [Agents Execute Independently - Any Language/Platform]
+    subgraph Agents [Agent Instances Execute Independently - Any Language/Platform]
         direction TB
-        AG2[Agent Accepts Job<br/>Returns status: accepted]
-        AG3[Agent Executes Work<br/>Asynchronously]
-        AG4[Agent Updates DB<br/>AgentJobExecution table]
-        AG5[Agent Writes Results<br/>to Database]
+        AG2[Agent Instance Accepts Job<br/>Returns status: accepted<br/>Updates currentLoad]
+        AG3[Agent Instance Executes Work<br/>Asynchronously]
+        AG4[Agent Instance Updates DB<br/>AgentJobExecution table]
+        AG5[Agent Instance Writes Results<br/>to Database<br/>Decrements currentLoad]
     end
     
     AG1 --> AG2
@@ -731,7 +924,7 @@ flowchart TD
     
     AG5 --> DB5[(Database<br/>All agents read/write<br/>independently)]
     
-    DB5 --> S18[Scheduler queries DB<br/>AgentJobExecution table<br/>for job status]
+    DB5 --> S18[Orchestrator queries DB<br/>AgentJobExecution & AgentInstance tables<br/>for job status & instance health]
     S18 --> S19[Update ScheduleExecution<br/>Table]
     S19 --> R[Return orchestration results]
 "

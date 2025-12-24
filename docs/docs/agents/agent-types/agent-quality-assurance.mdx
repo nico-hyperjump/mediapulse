@@ -158,7 +158,12 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 
 7. **Write Results**: Store validation results and approval status in database
 
-8. **Note on Retries**: The QA Agent does not directly trigger content generation retries. It writes `requiresRevision: true` to the database. The Scheduler Agent (or a separate retry mechanism) monitors QA results and can enqueue a Content Generation retry job if needed.
+8. **Note on Retries**: The QA Agent does not directly trigger content generation retries. It writes `requiresRevision: true` to the database. The Scheduler/Orchestrator (or a separate retry mechanism) monitors QA results and can enqueue a Content Generation retry job if needed.
+
+**Note**: 
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
 
 9. **Return**: Validation results
 
@@ -167,7 +172,7 @@ Validate newsletter content for accuracy, quality, compliance, and completeness 
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] --> B[Quality Assurance Agent<br/>Triggered independently]
+    A[Scheduler/Orchestrator] --> B[Quality Assurance Agent<br/>Triggered independently<br/>Multiple instances can run in parallel]
     B --> C[Agent reads newsletter from Database]
     C --> C2[Agent reads source data from Database]
     C2 --> C3[Agent reads analysis results from Database]

@@ -6,6 +6,11 @@ title: Content Generation Agent
 
 Transform analysis results into a well-structured, personalized newsletter with executive-friendly format. The agent dynamically generates sections based on available analysis results, allowing newsletters to adapt automatically when new analysis types are added or removed.
 
+**Note**: 
+- Multiple instances of the same agent version can run in parallel for horizontal scaling.
+- Only one version of this agent type can be active in production at a time.
+- The orchestrator distributes jobs across available agent instances using load balancing.
+
 ## Inputs
 
 - `ticker: string` - Company identifier
@@ -192,7 +197,7 @@ The newsletter structure is dynamic and adapts to available analysis results:
 <Mermaid
   chart="
 flowchart TD
-    A[Scheduler] --> B[Content Generation Agent<br/>Triggered independently]
+    A[Scheduler/Orchestrator] --> B[Content Generation Agent<br/>Triggered independently<br/>Multiple instances can run in parallel]
     B --> B1[Load section config<br/>from Database]
     B1 --> B2[Query AnalysisTypeRegistry<br/>for section templates]
     B2 --> C[Agent reads analysis results<br/>from Database]

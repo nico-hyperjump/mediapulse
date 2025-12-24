@@ -64,7 +64,10 @@ The `agentVersion` field is separate from `agentId` (which identifies the agent 
 }
 ```
 
-**Note**: `AgentVersion` stores snapshots of configurations and prompts, but does not replace `AgentConfig`. When a version is deployed, the agent reads from `AgentConfig` (which may be updated to match the version's config). The version serves as a historical record and rollback point.
+**Note**: `AgentVersion` stores snapshots of configurations and prompts, but does not replace `AgentConfig`. When a version is deployed:
+1. `AgentConfig` is updated to match the version's configuration from `AgentVersion.config`
+2. Agents read from `AgentConfig` at runtime (this is the source of truth)
+3. The `AgentVersion` serves as a historical record and rollback point
 
 **`AgentVersionDeployment`** - Tracks which version is active in each environment:
 
@@ -209,10 +212,12 @@ draft → experimental → testing → production
 ### 4. Production Deployment
 
 - Only versions that pass validation can be deployed to production
-- Deployment updates `AgentVersionDeployment` table to mark the active version
-- The agent's `AgentConfig` is updated to match the version's configuration (or agents read version config directly)
+- **Deployment Process**:
+  1. `AgentVersionDeployment` table is updated to mark the new version as active
+  2. `AgentConfig` table is updated to match the version's configuration from `AgentVersion.config`
+  3. Agents read from `AgentConfig` at runtime (the source of truth)
+  4. Agent instances reload configuration from database (hot-reload without restart, but may require agent re-initialization)
 - Previous production version automatically tracked for rollback
-- Agent instances reload configuration from database (hot-reload without restart, but may require agent re-initialization)
 - **Note**: Code changes (if any) still require code deployment, but config/prompt changes can be hot-reloaded
 
 ### 5. Version Rollback
