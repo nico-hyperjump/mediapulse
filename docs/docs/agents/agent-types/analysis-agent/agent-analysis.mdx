@@ -25,13 +25,12 @@ The Analysis Agent uses a **plugin-based system** where analysis types are regis
 
 ## Inputs
 
-- `ticker: string` - Company identifier
-- `analysisTypes: string[]` - Which analyses to perform (dynamically loaded from `AnalysisTypeRegistry`, e.g., `['sentiment', 'competitive', 'event']`)
-- `userPreferences: { focusAreas: string[] }` - Optional user context
-
-**Note**: The agent reads collected data directly from the database. It does not receive data from the Data Collection Agent. The agent works independently and queries the database for the latest collected data for the specified ticker.
-
-The `analysisTypes` parameter references registered analysis types from the `AnalysisTypeRegistry` table. Only enabled analysis types can be executed.
+```typescript
+interface AnalysisInput {
+  tickerId: number; // Required: Foreign key to the Ticker table
+  jobId?: string; // Optional: Job ID for tracking this run
+}
+```
 
 ## Analysis Plugin Interface
 
@@ -112,7 +111,8 @@ The output structure is generic and supports any registered analysis type:
 {
   agentId: 'analysis',
   agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
-  ticker: string,
+  tickerId: number,
+  jobId: string,
   timestamp: Date,
   executionTime: number,
   analyses: {
@@ -146,7 +146,8 @@ The output structure is generic and supports any registered analysis type:
 ```typescript
 {
   agentId: 'analysis',
-  ticker: 'AAPL',
+  tickerId: number,
+  jobId: string,
   timestamp: Date,
   executionTime: 45000,
   analyses: {
