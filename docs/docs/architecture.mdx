@@ -9,14 +9,14 @@ The project consists of multiple apps, agents, and packages.
 ```
 mediapulse/
 ├── apps/
-│   ├── web/                    # Next.js user dashboard
+│   ├── user/                    # Next.js web app for users
 │   │   ├── app/
 │   │   │   ├── (auth)/
 │   │   │   ├── dashboard/
 │   │   │   ├── newsletters/
 │   │   │   └── api/
 │   │   └── components/
-│   ├── admin/                  # Next.js admin dashboard
+│   ├── admin/                   # Next.js web app for admins
 │   │   ├── app/
 │   │   │   ├── (auth)/
 │   │   │   ├── dashboard/
@@ -27,10 +27,46 @@ mediapulse/
 │   │   │   ├── monitoring/
 │   │   │   └── api/
 │   │   └── components/
-│   └── scheduler/              # Scheduler service (invokes agents via HTTP)
+│   ├── scheduler/               # Long-running app to execute schedules and orchestrate agents
+│   │   └── src/
+│   │       ├── scheduler.ts     # Main scheduler implementation
+│   │       ├── agent-client.ts  # HTTP client for agent invocations
+│   │       └── ...
+│   ├── agent-registry-api/      # Server (Next.js or other) with endpoints for agents to report status
+│   │   └── src/
+│   │       ├── api/
+│   │       │   ├── register.ts  # Agent registration endpoint
+│   │       │   ├── heartbeat.ts # Agent heartbeat/status reporting
+│   │       │   └── ...
+│   │       └── ...
+│   ├── query-strategy/          # Single endpoint server for query strategy agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       └── ...
+│   ├── data-collection/         # Single endpoint server for data collection agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       └── ...
+│   ├── analysis-agent/          # Single endpoint server for analysis agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       ├── plugins/         # Analysis plugin implementations
+│   │       └── ...
+│   ├── content-generation/      # Single endpoint server for content generation agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       └── ...
+│   ├── quality-assurance/       # Single endpoint server for QA agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       └── ...
+│   ├── delivery/                # Single endpoint server for delivery agent
+│   │   └── src/
+│   │       ├── index.ts         # Agent implementation
+│   │       └── ...
+│   └── learning/                # Single endpoint server for learning agent
 │       └── src/
-│           ├── scheduler.ts    # Main scheduler implementation
-│           ├── agent-client.ts # HTTP client for agent invocations
+│           ├── index.ts         # Agent implementation
 │           └── ...
 ├── packages/
 │   ├── shared/                  # Shared types and utilities
@@ -43,10 +79,6 @@ mediapulse/
 └── package.json                 # Turborepo monorepo config
 ```
 
-**Note**: 
-- The **Scheduler/Orchestrator** (`apps/scheduler/`) is a core system component, not an agent. It orchestrates agent execution.
-- **Agents** are language-agnostic and can be implemented anywhere. They register themselves in the database and expose HTTP endpoints. See [Agent Specification](./agents/agent-specification) for details.
-- The `packages/agents/` directory (if it exists) would contain shared utilities, SDKs, or helper libraries for agent development.
 
 ## System Components
 
@@ -65,19 +97,34 @@ The **Scheduler/Orchestrator** is **not an agent** but a core system component t
 
 The orchestrator is a separate service (`apps/scheduler/`) that invokes agents via HTTP endpoints. See [Scheduler/Orchestrator Documentation](./agents/agent-types/agent-scheduler) for details.
 
+### Agent Registry API
+
+The **Agent Registry API** (`apps/agent-registry-api/`) is a server that provides endpoints for agents to:
+
+- **Register themselves** when they start up (agent type, version, endpoint URL, capacity)
+- **Report status** via heartbeat mechanism (current load, health status, availability)
+- **Update capacity** and load information in real-time
+- **Deregister** when shutting down
+
+The orchestrator uses this API to:
+- Discover available agent instances
+- Monitor agent health and availability
+- Track instance capacity and current load for load balancing
+- Automatically detect and handle failed instances
+
+The Agent Registry API maintains the `AgentInstance` table in the database, which tracks all running agent instances and their status. This enables the orchestrator to make informed decisions about job distribution and instance management.
+
 ### Agents
 
-Agents are **language-agnostic** services that perform specific tasks. The system has **seven agent types**:
+**Agents** are language-agnostic services that expose HTTP endpoints. Each agent type has its own dedicated app:
+  - `apps/query-strategy/` - Query Strategy Agent
+  - `apps/data-collection/` - Data Collection Agent
+  - `apps/analysis-agent/` - Analysis Agent
+  - `apps/content-generation/` - Content Generation Agent
+  - `apps/quality-assurance/` - Quality Assurance Agent
+  - `apps/delivery/` - Delivery Agent
+  - `apps/learning/` - Learning Agent
 
-1. **Query Strategy Agent** - Generates search queries and manages entity graphs
-2. **Data Collection Agent** - Collects raw media data from search sources
-3. **Analysis Agent** - Analyzes collected data using registered analysis types
-4. **Content Generation Agent** - Generates newsletter content
-5. **Quality Assurance Agent** - Validates and approves content
-6. **Delivery Agent** - Sends newsletters to users
-7. **Learning Agent** - Analyzes metrics and optimizes configurations
-
-**Note**: The **Scheduler/Orchestrator** is **not an agent** but a core system component that orchestrates these agents. See the [Orchestrator (Scheduler)](#orchestrator-scheduler) section above for details.
 
 #### Agent Versioning
 
@@ -202,7 +249,7 @@ Analysis plugin implementation code must be located in the codebase. The recomme
 
 ```
 apps/
-  analysis-agent/              # Or wherever the Analysis Agent is deployed
+  analysis-agent/              # Analysis Agent app
     src/
       plugins/
         sentiment/
