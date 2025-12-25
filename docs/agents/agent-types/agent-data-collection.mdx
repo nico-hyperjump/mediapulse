@@ -51,17 +51,13 @@ Collect raw media data by querying admin-configured search sources (e.g., Serper
 
 ```typescript
 interface DataCollectionInput {
-  identifier: {
-    type: "ticker" | "isin" | "cusip" | "sedol" | "custom";
-    value: string; // e.g., "AAPL", "TSLA"
-  };
-  timeWindow: {
+  tickerId: number; // Required: Foreign key to the Ticker table
+  timeWindow?: {
     start: Date;
     end: Date;
-  };
+  }; // Optional: Time window for collection
   priority: "high" | "medium" | "low"; // Collection urgency (affects retry behavior)
-  configOverride?: Partial<DataCollectionConfig>; // Optional runtime config override
-  collectionId?: string; // Optional: unique ID for tracking this collection run
+  jobId?: string; // Optional: Job ID for tracking this run
 }
 ```
 
@@ -192,10 +188,8 @@ interface DataCollectionInput {
 {
   agentId: 'data-collection',
   agentVersion: string,                // Semantic version (e.g., "1.2.3") of the agent that generated this output
-  identifier: {
-    type: 'ticker' | 'isin' | 'cusip' | 'sedol' | 'custom',
-    value: string
-  },
+  tickerId: number,
+  jobId: string,
   timestamp: Date,
   executionTime: number,               // Milliseconds
   data: {

@@ -8,16 +8,17 @@ ID: `content-generation`
 
 ## Purpose
 
-Transform analysis results into a well-structured, personalized newsletter with executive-friendly format. The agent dynamically generates sections based on available analysis results, allowing newsletters to adapt automatically when new analysis types are added or removed.
+Transform analysis results into a well-structured newsletter with executive-friendly format. The agent dynamically generates sections based on available analysis results, allowing newsletters to adapt automatically when new analysis types are added or removed.
 
 
 ## Inputs
 
-- `ticker: string` - Company identifier
-- `userId: string` - User identifier
-- `newsletterType: 'daily' | 'weekly' | 'event-driven'` - Newsletter type
-
-**Note**: The agent reads analysis results and user preferences directly from the database. It does not receive data from the Analysis Agent. The agent works independently and queries the database for the latest analysis results and user preferences.
+```typescript
+interface ContentGenerationInput {
+  tickerId: number; // Required: Foreign key to the Ticker table
+  jobId?: string; // Optional: Job ID for tracking this run
+}
+```
 
 ## Configurations
 
@@ -75,8 +76,8 @@ The newsletter structure is dynamic and adapts to available analysis results:
 {
   agentId: 'content-generation',
   agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
-  ticker: string,
-  userId: string,
+  tickerId: number,
+  jobId: string,
   timestamp: Date,
   executionTime: number,
   newsletter: {
@@ -136,7 +137,7 @@ The newsletter structure is dynamic and adapts to available analysis results:
    - Load section configuration and mapping from database
 
 2. **Read Data**: 
-   - Query database for analysis results and user preferences (independent of Analysis Agent)
+   - Query database for analysis results
    - Query `AnalysisTypeRegistry` for section templates
 
 3. **Section Resolution**:
@@ -151,7 +152,6 @@ The newsletter structure is dynamic and adapts to available analysis results:
 
    - Combine analysis results into structured context
    - Map analysis results to their corresponding sections
-   - Add user preferences and focus areas
    - Include previous newsletter for trend context (if available)
    - Determine A/B test variant (if active)
 
@@ -171,13 +171,6 @@ The newsletter structure is dynamic and adapts to available analysis results:
      - Generate content using analysis results
      - Format according to section configuration
    - **Action Items**: Generate actionable recommendations (if enabled)
-
-7. **Personalization**:
-
-   - Adjust detail level based on user preferences
-   - Emphasize focus areas
-   - Customize tone if user has preferences
-   - Show/hide sections based on user preferences
 
 8. **Formatting**:
 

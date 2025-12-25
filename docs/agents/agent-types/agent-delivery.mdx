@@ -12,15 +12,13 @@ Deliver approved newsletters via email and update web dashboard, track delivery 
 
 ## Inputs
 
-- `ticker: string` - Company identifier
-- `userId: string` - User identifier
-- `newsletterId: string` - Newsletter identifier
-- `deliveryChannels: ('email' | 'dashboard')[]` - Where to deliver
-- `scheduleTime?: Date` - Optional scheduled delivery time
+```typescript
+interface DeliveryInput {
+  userTickerId: number; // Required: Foreign key to the UserTicker table
+  jobId?: string; // Optional: Job ID for tracking this run
+}
+```
 
-**Note**: The agent reads approved newsletter content and user information directly from the database. It does not receive data from the QA Agent. The agent works independently and queries the database for the approved newsletter and user details. Each newsletter is personalized for a specific user (identified by `userId`), so each delivery job handles a single recipient.
-
-**Multiple Recipients**: When multiple users are subscribed to the same ticker, the Scheduler/Orchestrator creates separate delivery jobs for each user-ticker subscription. Each delivery job handles one personalized newsletter for one user. Multiple delivery jobs execute in parallel across multiple agent instances, allowing efficient delivery to all subscribers. Rate limiting (configured in `rateLimiting.emailsPerMinute`) applies across all concurrent delivery jobs to respect email provider limits.
 
 ## Configurations
 
@@ -74,8 +72,8 @@ Configuration is stored in `AgentConfig` with identifier `delivery` and the foll
 {
   agentId: 'delivery',
   agentVersion: string,                 // Semantic version (e.g., "1.2.3") of the agent that generated this output
-  newsletterId: string,
-  userId: string,
+  userTickerId: number,
+  jobId: string,
   timestamp: Date,
   executionTime: number,
   delivery: {
@@ -102,7 +100,7 @@ Configuration is stored in `AgentConfig` with identifier `delivery` and the foll
 ## Process
 
 1. **Initialize**: Load email config
-2. **Read Data**: Query database for approved newsletter and user information (independent of QA Agent)
+2. **Read Data**: Query database for approved newsletter and user information
 3. **Email Delivery** (if enabled):
 
    - **Personalization**: Newsletter is already personalized for the user (from Content Generation Agent)

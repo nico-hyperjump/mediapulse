@@ -1,5 +1,5 @@
 {
   "title": "MediaPulse",
   "root": true,
-  "pages": ["introduction", "architecture", "system-flow", "agents", "plan"]
+  "pages": ["introduction", "architecture", "system-flow", "scheduler", "agent-registry-api", "agents", "plan"]
 }
