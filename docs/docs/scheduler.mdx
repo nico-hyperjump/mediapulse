@@ -13,9 +13,11 @@ The scheduler runs continuously as a BullMQ worker, polling the database for sch
 **Key Responsibilities**:
 - Dynamically discover agents from the database (no hardcoded agent list)
 - Execute schedules created by admins (stored in `Schedule` table)
-- **Support ID expansion** for agents that accept ID parameters (e.g., `tickerId`, `userId`)
-  - When `value: 'all'` is set, query database table and create multiple job inputs
-  - Process jobs in batches with stagger delay to avoid overloading agents
+- **Support data source expansion** for any agent parameter
+  - Parse data source strings (e.g., `db:ticker:all:id?enabled=true` or `db:user:all:email?active=true`) to query database tables
+  - Extract values from any specified column (not limited to `id` fields)
+  - Create multiple job inputs from expanded values, processing in batches with stagger delay
+  - Support complex filters via query string parameters or JSON filter objects
 - Orchestrate multi-agent pipelines with job dependencies (stored in `Pipeline` table)
 - Manage different schedule types: once or repeating (cron/interval)
 - Poll database continuously for schedules that need execution
@@ -65,22 +67,15 @@ Stores all schedules created by admins. No hardcoded schedules. A schedule can r
   agentId?: string; // If targetType is 'agent', references AgentRegistry
   pipelineId?: string; // If targetType is 'pipeline', references Pipeline
   
-  // Agent parameters (merged with any ID expansions)
+  // Agent parameters (any parameter with a data source string will be expanded)
+  // Data source strings use URI scheme format: <source>:<table>:<filter>:<field>[?options]
+  // Examples:
+  //   - "db:ticker:all:id" - All IDs from ticker table
+  //   - "db:ticker:AAPL:id" - Specific ticker ID
+  //   - "db:ticker:all:id?enabled=true" - All enabled tickers
+  //   - "db:ticker:all:id?enabled=true&batchSize=10&staggerDelay=2000" - With batch options
+  //   - "db:ticker:all:id?filter={\"enabled\":true,\"status\":\"active\"}" - Complex filter
   params?: Record<string, any>; // Parameters to pass to agent(s)
-  
-  // ID expansion configuration (for agents that accept IDs like tickerId, userId, etc.)
-  // When an ID parameter is set to 'all', the scheduler will fetch all IDs from the table
-  // and create multiple job inputs, running them in batches with stagger delay
-  idExpansions?: {
-    // Map of parameter name to expansion config
-    // Example: { tickerId: { table: 'Ticker', value: 'all' | string } }
-    [paramName: string]: {
-      table: string; // Database table name (e.g., 'Ticker', 'User')
-      value: 'all' | string; // 'all' to expand to all IDs, or specific ID string
-      batchSize?: number; // Number of IDs per batch (default: 10)
-      staggerDelay?: number; // Delay between batches in milliseconds (default: 1000)
-    };
-  };
   
   // Retry configuration
   retryConfig?: {
@@ -179,9 +174,9 @@ This is the minimal configuration for the orchestrator. It is stored in the `Age
     }
   },
   
-  // Default ID expansion settings (can be overridden per schedule)
-  defaultIdExpansion: {
-    batchSize: 10, // Default batch size for ID expansions
+  // Default batch processing settings (can be overridden via query params in data source strings)
+  defaultBatchProcessing: {
+    batchSize: 10, // Default batch size for data source expansions
     staggerDelay: 1000 // Default delay between batches (ms)
   },
   
@@ -208,7 +203,7 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
 - `jobsEnqueued`: Number of jobs successfully enqueued
 - `errors`: Array of any errors encountered
 - `metadata`: Additional execution metadata including:
-  - ID expansion details (total IDs, batches processed, batch size)
+  - Data source expansion details (total IDs, batches processed, batch size)
   - Pipeline execution details (if pipeline was executed)
 
 **AgentJobExecution Table** - Records each individual agent job:
@@ -221,7 +216,7 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
 - `priority`: Job priority
 - `enqueuedAt`: When the job was enqueued
 - `dependencies`: Job IDs this job depends on
-- `params`: Agent-specific parameters (merged from schedule + expanded IDs)
+- `params`: Agent-specific parameters (merged from schedule + expanded values)
 
 **Note**: The scheduler writes execution records to the database immediately after invoking agent HTTP endpoints. Actual job and pipeline status is tracked in the database (`AgentJobExecution` and `ScheduleExecution` tables) and can be queried separately. Agents update their job status in the database as they execute.
 
@@ -236,10 +231,11 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
    - Validate agent endpoints are accessible (health checks)
    - Initialize BullMQ queues for schedule execution
    - Register BullMQ workers for processing schedules
-   - Initialize job dependency tracking (for pipelines)
-   - Initialize ID cache (optional, for performance when processing many IDs)
-   - Initialize HTTP client pool for agent invocations
-   - Start polling loop to check for schedules that need execution
+  - Initialize job dependency tracking (for pipelines)
+  - Initialize data source parser for ID expansion strings
+  - Initialize ID cache (optional, for performance when processing many IDs)
+  - Initialize HTTP client pool for agent invocations
+  - Start polling loop to check for schedules that need execution
 
 2. **Agent Discovery**:
 
@@ -258,35 +254,69 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
    - For one-time schedules: After execution, mark schedule as disabled or delete it (configurable)
    - For repeating schedules: Schedule next execution based on cron/interval
 
-4. **ID Expansion** (for agents that accept ID parameters):
+4. **Data Source Expansion** (for any agent parameter):
 
-   The orchestrator expands ID parameters based on `idExpansions` in schedules:
+   The orchestrator expands parameters based on data source strings in `params`. Any parameter value that matches the data source string format will be expanded, extracting values from the specified database column (not limited to ID fields).
 
-   **4a. ID Expansion Process**:
-   - For each parameter in `idExpansions`:
-     - If `value = 'all'`:
-       - Query the specified table from database (e.g., `Ticker`, `User`)
-       - Filter by enabled/active status if applicable
-       - Get all IDs from the table
-     - If `value` is a specific ID string:
-       - Use that single ID
+   **4a. Data Source String Format**:
+   
+   Format: `<source>:<table>:<filter>:<field>[?<options>]`
+   
+   Components:
+   - `<source>`: Data source identifier (currently `db` for database, extensible for future sources like `api`, `file`, `cache`)
+   - `<table>`: Database table name (e.g., `ticker`, `user`)
+   - `<filter>`: `all` to get all rows, or specific ID value (e.g., `AAPL`)
+   - `<field>`: Column name to extract (e.g., `id`, `tickerId`)
+   - `<options>`: Optional query string parameters:
+     - Simple filters: `enabled=true`, `status=active` (multiple conditions: `enabled=true&status=active`)
+     - Batch options: `batchSize=10`, `staggerDelay=2000`
+     - Complex filters: `filter={"enabled":true,"status":"active"}` (JSON object for complex conditions)
+   
+   **Security**: All database queries use parameterized queries to prevent SQL injection. Filter values are validated and sanitized.
+
+   **4b. ID Expansion Process**:
+   - For each parameter in `params`:
+     - Check if value is a data source string (matches format `<source>:<table>:<filter>:<field>`)
+     - If yes, parse the string:
+       - Extract source, table, filter, field, and query parameters
+       - If `filter = 'all'`:
+         - Build parameterized SQL query with WHERE conditions from query string
+         - Query the specified table from database (e.g., `Ticker`, `User`)
+         - Apply filters from query parameters (e.g., `enabled=true`)
+         - Get all matching IDs from the specified field
+       - If `filter` is a specific ID value:
+         - Use that single ID (still applies WHERE filters if provided)
+     - If not a data source string:
+       - Use the value as-is (no expansion)
    - If multiple IDs are found (from 'all' expansion):
-     - Group IDs into batches based on `batchSize` (default: 10)
+     - Group IDs into batches based on `batchSize` from query params or default (10)
      - Create multiple job inputs, one per ID
-     - Apply stagger delays between batches based on `staggerDelay` (default: 1000ms) to avoid overloading agents
+     - Apply stagger delays between batches based on `staggerDelay` from query params or default (1000ms)
    - If single ID or no expansion:
      - Create single job input
 
-   **4b. Example: Ticker Expansion**:
-   - Schedule has `idExpansions: { tickerId: { table: 'Ticker', value: 'all', batchSize: 10, staggerDelay: 1000 } }`
-   - Scheduler queries `Ticker` table and finds 100 enabled tickers
+   **4c. Example: All Tickers with Filter**:
+   - Schedule has `params: { tickerId: "db:ticker:all:id?enabled=true&batchSize=10&staggerDelay=1000" }`
+   - Scheduler parses the string and queries `Ticker` table with `WHERE enabled = true`
+   - Finds 100 enabled tickers
    - Creates 100 job inputs (one per ticker)
    - Processes in batches of 10 with 1 second delay between batches
    - Each job gets `params: { tickerId: '<specific-ticker-id>', ...otherParams }`
 
-   **4c. Example: Specific ID**:
-   - Schedule has `idExpansions: { tickerId: { table: 'Ticker', value: 'AAPL' } }`
+   **4d. Example: Specific ID**:
+   - Schedule has `params: { tickerId: "db:ticker:AAPL:id" }`
    - Creates single job input with `params: { tickerId: 'AAPL', ...otherParams }`
+
+   **4e. Example: Complex Filter**:
+   - Schedule has `params: { tickerId: "db:ticker:all:id?filter={\"enabled\":true,\"status\":\"active\",\"createdAt\":{\"$gte\":\"2024-01-01\"}}" }`
+   - Scheduler parses JSON filter and builds parameterized query
+   - Queries tickers matching all conditions
+   - Creates job inputs for each matching ticker
+
+   **4f. Example: Multiple Filters**:
+   - Schedule has `params: { tickerId: "db:ticker:all:id?enabled=true&active=1&batchSize=5" }`
+   - Scheduler queries with `WHERE enabled = true AND active = 1`
+   - Processes in batches of 5 (overrides default batchSize)
 
 5. **Job Creation**:
 
@@ -298,15 +328,15 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
    - Validate that target exists in `AgentRegistry` or `Pipeline` table
 
    **5b. ID Expansion**:
-   - Check if `idExpansions` is configured
-   - For each parameter in `idExpansions`, expand IDs (see section 4)
+   - For each parameter in `params`, check if value is a data source string
+   - For each data source string found, expand IDs (see section 4)
    - If multiple IDs found, create multiple job inputs (one per ID)
-   - Merge expanded IDs with base `params` from schedule
+   - Replace data source strings with actual ID values in job parameters
 
    **5c. Batch Processing**:
-   - If multiple job inputs created (from ID expansion):
-     - Group job inputs into batches based on `batchSize` from expansion config
-     - Process batches sequentially with `staggerDelay` between batches
+   - If multiple job inputs created (from data source expansion):
+     - Group job inputs into batches based on `batchSize` from query params or default
+     - Process batches sequentially with `staggerDelay` between batches (from query params or default)
      - Within each batch, process jobs in parallel (up to batch size)
    - If single job input:
      - Process immediately
@@ -315,7 +345,7 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
    - For each job input:
      - Generate unique `jobId` and `executionId`
      - Create execution record in `AgentJobExecution` table with `status: 'pending'`
-     - Build execution request with merged parameters (schedule params + expanded IDs)
+     - Build execution request with merged parameters (schedule params + expanded values)
      - Validate parameters against agent's `inputSchema`
      - Get agent HTTP endpoint URL from `AgentRegistry` table
      - Invoke agent HTTP endpoint (POST to agent endpoint URL)
@@ -326,7 +356,7 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
        - Agent accepts the job and starts execution
        - Agent updates `AgentJobExecution` table as it runs
        - If agent fails to start: Mark execution as failed, log error
-     - Apply stagger delays between batches (if configured for ID expansion)
+     - Apply stagger delays between batches (if configured for data source expansion)
    - Track job creation in `ScheduleExecution` table
 
 6. **Pipeline Orchestration**:
@@ -337,10 +367,10 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
    - Load pipeline definition from `Pipeline` table
    - Validate all referenced `agentId` values exist in `AgentRegistry`
 
-   **6b. ID Expansion** (if configured in schedule):
-   - Apply `idExpansions` from schedule (same as single agent expansion)
-   - Expand IDs for each parameter that needs expansion
-   - If multiple IDs found, create multiple pipeline execution contexts (one per ID)
+   **6b. Data Source Expansion** (if data source strings in schedule params):
+   - Parse data source strings from schedule `params` (same as single agent expansion)
+   - Expand values for each parameter that contains a data source string
+   - If multiple values found, create multiple pipeline execution contexts (one per value)
 
    **6c. Build Dependency Graph**:
    - Parse pipeline `steps` to build dependency graph
@@ -353,7 +383,7 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
      - Build dependency graph based on `dependsOn` relationships
      - For steps without dependencies: Invoke agent endpoints immediately
      - For steps with dependencies: Wait for dependency jobs to complete (check `AgentJobExecution.status`)
-     - Merge step-specific `params` with expanded IDs and schedule params
+     - Merge step-specific `params` with expanded values and schedule params
      - Invoke agent endpoints with proper sequencing
    - Track pipeline execution in database
 
@@ -383,23 +413,23 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
 
 9. **Batch Processing & Parallelization**:
 
-   - **ID Expansion with Batching**:
-     - When `idExpansions` creates multiple job inputs (e.g., 100 tickers):
-       - Jobs are grouped into batches based on `batchSize` (default: 10)
+   - **Data Source Expansion with Batching**:
+     - When data source strings create multiple job inputs (e.g., 100 tickers):
+       - Jobs are grouped into batches based on `batchSize` from query params or default (10)
        - Within each batch, jobs are processed in parallel (up to batch size)
-       - Between batches, `staggerDelay` is applied (default: 1000ms) to avoid overloading agents
-       - Example: 100 tickers with `batchSize: 10` = 10 batches, each batch processes 10 jobs in parallel with 1 second delay between batches
+       - Between batches, `staggerDelay` is applied (from query params or default: 1000ms) to avoid overloading agents
+       - Example: 100 tickers with `batchSize=10` in query string = 10 batches, each batch processes 10 jobs in parallel with 1 second delay between batches
      - Agents execute work asynchronously after accepting jobs
    
-   - **Single ID Jobs** (no expansion or specific ID):
-     - Single job processes with one ID parameter
+   - **Single Value Jobs** (no expansion or specific value):
+     - Single job processes with one parameter value
      - Can run concurrently with other agent jobs
      - Invoked via HTTP endpoint when needed
    
    - **Pipeline Steps**:
      - Steps with `parallel: true` can run concurrently
      - Steps with `dependsOn` run sequentially after dependencies complete
-     - If ID expansion creates multiple contexts (e.g., 100 tickers), each context runs the pipeline independently
+     - If data source expansion creates multiple contexts (e.g., 100 tickers), each context runs the pipeline independently
      - Example: Pipeline with 100 ticker expansions = 100 parallel pipeline executions
      - Each execution invokes agent HTTP endpoints as needed
 
@@ -414,13 +444,13 @@ As a BullMQ worker, the scheduler doesn't return outputs directly. Instead, it w
      - Agents can scale independently to handle their own load
    
    - **Dynamic Management**:
-     - New IDs are automatically included in next scheduled run when `value: 'all'` is used
-     - Disabled/removed IDs are excluded from processing
+     - New IDs are automatically included in next scheduled run when `filter: 'all'` is used
+     - Filters (e.g., `enabled=true`) automatically exclude disabled/removed IDs from processing
      - Priority can be set per schedule to influence job priority
    
    - **Resource Management**:
-     - `batchSize` in `idExpansions` controls concurrent job execution per batch
-     - `staggerDelay` controls rate of batch processing
+     - `batchSize` in query params (or default) controls concurrent job execution per batch
+     - `staggerDelay` in query params (or default) controls rate of batch processing
      - Queue concurrency settings limit total parallel workers
      - Memory and CPU usage scales with batch size and concurrency
 
@@ -478,14 +508,17 @@ Admins can create and manage schedules and pipelines through the admin interface
      - **Timezone**: Default is `'America/New_York'`
      - **Start At**: Optional start time (for one-time or first run of repeating)
    - **Parameters**: Set agent parameters (JSON object)
-   - **ID Expansions** (optional): For agents that accept ID parameters:
-     - Add expansion for each ID parameter (e.g., `tickerId`, `userId`)
-     - **Table**: Database table name (e.g., `'Ticker'`, `'User'`)
-     - **Value**: 
-       - `'all'` to expand to all IDs in the table
-       - Specific ID string (e.g., `'AAPL'`) for single ID
-     - **Batch Size**: Number of IDs per batch (default: 10)
-     - **Stagger Delay**: Delay between batches in milliseconds (default: 1000)
+     - For data source expansion, use data source strings in parameter values:
+       - Format: `<source>:<table>:<filter>:<field>[?<options>]`
+       - Examples:
+         - `"db:ticker:all:id"` - All IDs from ticker table
+         - `"db:ticker:AAPL:id"` - Specific ticker ID
+         - `"db:ticker:all:id?enabled=true"` - All enabled tickers
+         - `"db:ticker:all:id?enabled=true&batchSize=10&staggerDelay=2000"` - With batch options
+         - `"db:ticker:all:id?filter={\"enabled\":true,\"status\":\"active\"}"` - Complex filter
+       - Simple filters: Use query string format `key=value&key2=value2`
+       - Complex filters: Use JSON in `filter` parameter
+       - Batch options: `batchSize` and `staggerDelay` in query string override defaults
    - **Retry Config**: Configure retry behavior (max retries, backoff, delay)
    - **Timeout**: Job timeout in milliseconds
    - **Priority**: Job priority (default: 0)
@@ -514,7 +547,7 @@ Admins can create and manage schedules and pipelines through the admin interface
 
 4. **Create a Schedule for the Pipeline**:
    - Create a schedule with `targetType: 'pipeline'` and select the pipeline
-   - Configure ID expansions if needed (applies to all pipeline steps)
+   - Add data source strings to parameters if needed (applies to all pipeline steps)
 
 ### Example: Query Strategy Agent Schedule
 
@@ -524,14 +557,14 @@ Admins can create and manage schedules and pipelines through the admin interface
 - `cronExpression`: `"0 2 * * 0"` (Sunday 2 AM)
 - `targetType`: `'agent'`
 - `agentId`: `"query-strategy"`
-- `params`: `{ "refreshEntityGraph": true }`
-- `idExpansions`: `{ tickerId: { table: "Ticker", value: "all", batchSize: 10, staggerDelay: 1000 } }`
+- `params`: `{ "tickerId": "db:ticker:all:id?enabled=true&batchSize=10&staggerDelay=1000", "refreshEntityGraph": true }`
 
 **Result**: Every Sunday at 2 AM, the scheduler:
-1. Queries `Ticker` table and finds 100 enabled tickers
-2. Creates 100 job inputs (one per ticker)
-3. Processes in batches of 10 with 1 second delay between batches
-4. Each job gets `params: { tickerId: '<specific-ticker-id>', refreshEntityGraph: true }`
+1. Parses `tickerId` data source string: `db:ticker:all:id?enabled=true&batchSize=10&staggerDelay=1000`
+2. Queries `Ticker` table with `WHERE enabled = true` and finds 100 enabled tickers
+3. Creates 100 job inputs (one per ticker)
+4. Processes in batches of 10 with 1 second delay between batches
+5. Each job gets `params: { tickerId: '<specific-ticker-id>', refreshEntityGraph: true }`
 
 ### Example: One-time Agent Execution
 
@@ -541,12 +574,13 @@ Admins can create and manage schedules and pipelines through the admin interface
 - `startAt`: `"2024-01-15T10:00:00Z"`
 - `targetType`: `'agent'`
 - `agentId`: `"data-collection"`
-- `params`: `{ "source": "news" }`
-- `idExpansions`: `{ tickerId: { table: "Ticker", value: "AAPL" } }`
+- `params`: `{ "tickerId": "db:ticker:AAPL:id", "source": "news" }`
 
-**Result**: On January 15, 2024 at 10:00 AM, the scheduler creates a single job with `params: { tickerId: "AAPL", source: "news" }`.
+**Result**: On January 15, 2024 at 10:00 AM, the scheduler:
+1. Parses `tickerId` data source string: `db:ticker:AAPL:id`
+2. Creates a single job with `params: { tickerId: "AAPL", source: "news" }`
 
-### Example: Pipeline Schedule with ID Expansion
+### Example: Pipeline Schedule with Data Source Expansion
 
 **Pipeline**:
 - `name`: "Newsletter Generation Pipeline"
@@ -561,13 +595,14 @@ Admins can create and manage schedules and pipelines through the admin interface
 - `cronExpression`: `"0 8 * * *"` (Daily at 8 AM)
 - `targetType`: `'pipeline'`
 - `pipelineId`: `"newsletter-generation-pipeline"`
-- `idExpansions`: `{ tickerId: { table: "Ticker", value: "all", batchSize: 5, staggerDelay: 2000 } }`
+- `params`: `{ "tickerId": "db:ticker:all:id?enabled=true&batchSize=5&staggerDelay=2000" }`
 
 **Result**: Every day at 8 AM, the scheduler:
-1. Queries `Ticker` table and finds 50 enabled tickers
-2. Creates 50 pipeline execution contexts (one per ticker)
-3. Processes in batches of 5 with 2 second delay between batches
-4. Each context runs the pipeline: collect → analyze → generate (sequential)
+1. Parses `tickerId` data source string: `db:ticker:all:id?enabled=true&batchSize=5&staggerDelay=2000`
+2. Queries `Ticker` table with `WHERE enabled = true` and finds 50 enabled tickers
+3. Creates 50 pipeline execution contexts (one per ticker)
+4. Processes in batches of 5 with 2 second delay between batches
+5. Each context runs the pipeline: collect → analyze → generate (sequential)
 
 ## Sequence Diagram
 
@@ -604,7 +639,7 @@ flowchart TD
     S5 --> S7{Has ID<br/>Expansion?}
     S6 --> S7
     
-    S7 -->|Yes - value: 'all'| S8[Query Table for All IDs<br/>e.g., Ticker table<br/>→ 100 tickers]
+    S7 -->|Yes - filter: 'all'| S8[Parse Data Source String<br/>Query Table with Filters<br/>e.g., Ticker WHERE enabled=true<br/>→ 100 tickers]
     S7 -->|Yes - specific ID| S9[Use Single ID<br/>e.g., tickerId: 'AAPL']
     S7 -->|No| S10[Create Single Job Input]
     
