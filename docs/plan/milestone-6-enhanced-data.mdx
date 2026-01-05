@@ -49,35 +49,56 @@ Expand data collection to multiple sources and improve data quality through bett
   - Track query performance
   - Prioritize high-performing queries
 
-### Agent Versioning System (Basic)
+### Agent Versioning System (Enhanced)
 
 - ✅ **Version Creation and Tracking**:
-  - Agent version tables in database
-  - Version creation for agent configs and prompts
+  - Uses `AgentVersion` table (already created in Milestone 1)
+  - Version creation for agent configs and prompts (configs include prompts embedded within them)
   - Version metadata (changelog, rationale, expected impact)
   - Version status tracking (draft, experimental, testing, production, deprecated)
+- ✅ **Enhanced Deployment System**:
+  - Uses `AgentVersionDeployment` table (already created in Milestone 1)
+  - Only one version per agentId can be active in production
+  - Version promotion flow:
+    1. Update `AgentVersionDeployment` to mark new version as active
+    2. Update `AgentConfig` table to match version's configuration from `AgentVersion.config`
+    3. Agents read from `AgentConfig` at runtime (hot-reload without restart)
+  - Rollback capability to previous production version:
+    - Update `AgentVersionDeployment` to previous version
+    - Update `AgentConfig` to match previous version's config
+    - Agents automatically reload configuration
 - ✅ **Basic Experimentation**:
   - Create experimental versions from production
   - Run test executions on experimental versions
   - Compare experimental vs production performance
-  - Basic validation checks before promotion
-- ✅ **Deployment System**:
-  - Version deployment tracking
-  - Rollback capability to previous production version
-  - Hot-reload configuration (no downtime)
+  - Basic validation checks before promotion (stored in `AgentValidation` table)
 - ✅ **Admin Dashboard**:
-  - Basic version management UI
+  - Basic version management UI (`/admin/agents/versions`)
   - Version comparison tools
-  - Deployment controls
+  - Deployment controls (promote to production, rollback)
   - Simple validation dashboard
 
 **Note**: The Agent Versioning System is a foundational infrastructure feature that enables safe iteration on agent improvements. While it's introduced in this milestone, it will be fully utilized in later milestones (particularly Milestone 14) when the Learning Agent creates optimized versions automatically.
 
+### Hermes Orchestrator (Instance Scaling Enhancement)
+
+- ✅ **Automatic Instance Scaling**:
+  - Monitors job queue size and instance load via `AgentInstance` table
+  - Spawns new instances when queue grows or instances are at capacity
+  - Scales down instances when load decreases (terminates idle instances)
+  - Configurable scaling policies (min/max instances per agent type)
+  - Instance lifecycle fully managed by orchestrator
+- ✅ **Instance Health Monitoring**:
+  - Monitors instance heartbeats via Agent Registry API
+  - Automatically replaces failed or unhealthy instances (instances with stale heartbeats)
+  - Tracks instance metrics (success rate, average execution time)
+  - Queries `AgentInstance` table for health status
+
 ### Database Updates
 
-- ✅ Agent version tables (`AgentVersion`, `AgentVersionDeployment`)
+- ✅ Agent version tables already exist (`AgentVersion`, `AgentVersionDeployment` - created in Milestone 1)
 - ✅ Basic experimentation tables (`AgentExperiment`, `AgentValidation`)
-- ✅ Version tracking in agent configs
+- ✅ Version tracking in agent configs (configs stored in `AgentConfig` table, snapshots in `AgentVersion` table)
 
 ## Task Timeline
 
@@ -102,19 +123,21 @@ gantt
     Query performance tracking               :b1, 2026-03-26, 1d
     Query prioritization                     :b2, after b1, 1d
     section Agent Versioning
-    Version tables schema                    :c1, 2026-03-26, 1d
-    Version creation system                  :c2, after c1, 2d
-    Version status tracking                  :c3, after c2, 1d
-    Experimentation system                   :c4, after c3, 2d
-    Version comparison                       :c5, after c4, 1d
-    Deployment system                        :c6, after c5, 2d
-    Rollback capability                      :c7, after c6, 1d
-    Hot-reload configuration                 :c8, after c7, 1d
+    Version creation system                  :c1, 2026-03-26, 2d
+    Version status tracking                  :c2, after c1, 1d
+    Experimentation system                   :c3, after c2, 2d
+    Version comparison                       :c4, after c3, 1d
+    Enhanced deployment system               :c5, after c4, 2d
+    Rollback capability                      :c6, after c5, 1d
+    Hot-reload configuration                 :c7, after c6, 1d
+    section Orchestrator
+    Instance scaling implementation         :d1, 2026-03-26, 2d
+    Health monitoring enhancement           :d2, after d1, 1d
     section Admin Dashboard
-    Version management UI                    :d1, after c3, 2d
-    Version comparison tools                 :d2, after d1, 1d
-    Deployment controls                      :d3, after d2, 1d
-    Validation dashboard                    :d4, after d3, 1d
+    Version management UI                    :e1, after c3, 2d
+    Version comparison tools                 :e2, after e1, 1d
+    Deployment controls                      :e3, after e2, 1d
+    Validation dashboard                    :e4, after e3, 1d
   "
 />
 
@@ -135,9 +158,14 @@ gantt
 - ✅ Deduplication removes 80%+ of duplicates
 - ✅ Relevance scoring filters low-quality content effectively
 - ✅ System handles multiple sources gracefully
-- ✅ Agent versioning system works correctly
+- ✅ Agent versioning system works correctly (version creation, deployment, rollback)
+- ✅ Only one version per agent can be active in production at a time
+- ✅ Version promotion updates both `AgentVersionDeployment` and `AgentConfig` tables
+- ✅ Agents hot-reload configuration when version is promoted (no restart required)
 - ✅ Admins can create and test experimental versions
 - ✅ Version comparison and rollback function properly
+- ✅ Orchestrator can automatically scale instances up/down based on load
+- ✅ Orchestrator replaces failed instances automatically
 
 ## Next Steps
 

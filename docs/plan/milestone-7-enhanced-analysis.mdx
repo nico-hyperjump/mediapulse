@@ -18,30 +18,46 @@ Add comprehensive analysis capabilities by implementing additional analysis plug
 
 ### Analysis Agent (Plugin Enhancements)
 
+- ✅ **Version Management for Plugins**:
+  - Plugin versions tracked in `AnalysisTypeRegistry.version` field
+  - Plugin code versioning (plugins can have multiple versions in codebase)
+  - Plugin configuration versioning (stored in `AgentConfig` table)
+  - Analysis Agent version includes plugin versions in metadata
+  - Plugin version information included in analysis outputs
 - ✅ **New Analysis Plugin - Competitive Analysis**:
+  - Code location: `apps/analysis-agent/src/plugins/competitive/`
   - Peer group identification (from Query Strategy entities)
   - Media coverage comparison across competitors
   - Industry trend analysis in media coverage
   - Competitive positioning assessment
-  - Registered as new plugin in `AnalysisTypeRegistry`
+  - Registered as new plugin in `AnalysisTypeRegistry` table
+  - Plugin version tracked in registry
 - ✅ **Enhanced Sentiment Analysis Plugin**:
+  - Code location: `apps/analysis-agent/src/plugins/sentiment/`
   - Weighted sentiment calculation
   - Time decay for older news
   - Sentiment trend detection
   - Source credibility weighting
-  - Plugin version updated with enhanced capabilities
+  - Plugin version updated in `AnalysisTypeRegistry` table
+  - Enhanced capabilities reflected in plugin version
 - ✅ **Enhanced Event/Context Analysis Plugin**:
+  - Code location: `apps/analysis-agent/src/plugins/event/`
   - External event identification (natural disasters, political changes, regulatory updates, economic shifts, social movements)
   - Relevance scoring for events
   - Impact assessment (operations, reputation, strategy)
   - Early warning signal detection
   - Opportunity identification
-  - Plugin version updated with enhanced capabilities
+  - Plugin version updated in `AnalysisTypeRegistry` table
+  - Enhanced capabilities reflected in plugin version
 - ✅ **Cross-Plugin Insight Extraction**:
   - Cross-analysis insight identification across all registered plugins
   - Priority scoring for insights
   - AI-powered insight generation
   - Plugin-aware insight aggregation
+- ✅ **Agent Versioning** (continues from previous milestones):
+  - Analysis Agent version includes plugin version information
+  - All outputs include `agentVersion` field
+  - Plugin versions tracked in analysis metadata
 
 ### Content Generation Agent (Enhanced)
 
@@ -67,15 +83,17 @@ gantt
     title Milestone 7 - Enhanced Analysis
     dateFormat  YYYY-MM-DD
     section Analysis Agent
-    Competitive analysis plugin             :a1, 2026-04-09, 3d
-    Plugin registration                     :a2, after a1, 1d
-    Sentiment plugin enhancement            :a3, 2026-04-09, 2d
-    Sentiment plugin version update         :a4, after a3, 1d
-    Event plugin enhancement                :a5, 2026-04-09, 2d
-    Event plugin version update             :a6, after a5, 1d
-    Cross-plugin insight extraction         :a7, after a2, 2d
-    Priority scoring                        :a8, after a7, 1d
-    AI insight generation                   :a9, after a8, 1d
+    Plugin version management system        :a1, 2026-04-09, 1d
+    Competitive analysis plugin             :a2, after a1, 3d
+    Plugin registration with versioning     :a3, after a2, 1d
+    Sentiment plugin enhancement            :a4, 2026-04-09, 2d
+    Sentiment plugin version update         :a5, after a4, 1d
+    Event plugin enhancement                :a6, 2026-04-09, 2d
+    Event plugin version update             :a7, after a6, 1d
+    Cross-plugin insight extraction         :a8, after a3, 2d
+    Priority scoring                        :a9, after a8, 1d
+    AI insight generation                   :a10, after a9, 1d
+    Plugin version in agent outputs         :a11, after a10, 1d
     section Content Generation
     Competitive section mapping             :b1, after a2, 1d
     Enhanced section templates              :b2, after a4, 1d
@@ -94,14 +112,17 @@ gantt
 
 ## Success Criteria
 
-- ✅ Competitive analysis plugin is registered and functional
-- ✅ All analysis plugins (sentiment, competitive, event) are calculated and stored
+- ✅ Plugin version management system is functional (plugin versions tracked in `AnalysisTypeRegistry`)
+- ✅ Competitive analysis plugin is registered and functional with version tracking
+- ✅ All analysis plugins (sentiment, competitive, event) are calculated and stored via Agent Data API
 - ✅ Plugin system demonstrates flexibility (new plugin added without core code changes)
+- ✅ Plugin versions are included in analysis outputs and agent metadata
 - ✅ Peer comparisons are relevant
 - ✅ Events are identified accurately with appropriate relevance scores
 - ✅ Newsletters dynamically include sections for all registered analysis plugins
 - ✅ Insights are actionable and relevant
 - ✅ Content generation adapts automatically to available analysis plugins
+- ✅ All outputs include `agentVersion` field with plugin version information
 
 ## Next Steps
 

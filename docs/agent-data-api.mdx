@@ -1,0 +1,19 @@
+---
+title: Agent Data API
+---
+
+## Purpose
+
+The **Agent Data API** is a server that provides endpoints for receiving data from the agents:
+
+- `POST /api/query-strategy/` - The output of the Query Strategy Agent
+- `POST /api/data-collection/` - The output of the Data Collection Agent
+- `POST /api/analysis-agent/` - The output of the Analysis Agent
+- `POST /api/content-generation/` - The output of the Content Generation Agent
+- `POST /api/quality-assurance/` - The output of the Quality Assurance Agent
+- `POST /api/delivery/` - The output of the Delivery Agent
+- `POST /api/learning/` - The output of the Learning Agent
+
+## Authentication
+
+The Agent Data API is authenticated using the API keys stored in the `AgentAuth` table. The API key is passed in the `Authorization` header as a Bearer token.

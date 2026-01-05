@@ -27,16 +27,37 @@ mediapulse/
 │   │   │   ├── monitoring/
 │   │   │   └── api/
 │   │   └── components/
-│   ├── scheduler/               # Long-running app to execute schedules and orchestrate agents
+│   ├── hermes-scheduler/               # Long-running app to execute schedules and orchestrate agents
 │   │   └── src/
 │   │       ├── scheduler.ts     # Main scheduler implementation
 │   │       ├── agent-client.ts  # HTTP client for agent invocations
+│   │       └── ...
+│   ├── agent-auth-api/          # Server (Next.js or other) to manage API keys used by agents
+│   │   └── src/
+│   │       ├── api/
+│   │       │   ├── add.ts    # Add a new api key
+│   │       │   ├── delete.ts   # Delete an api key
+│   │       │   ├── list.ts   # List all api keys
+│   │       │   ├── revoke.ts   # Revoke an api key
+│   │       │   ├── rotate.ts   # Rotate an api key
+│   │       │   ├── view.ts   # View an api key
+│   │       │   ├── update.ts   # Update an api key
+│   │       │   ├── enable.ts   # Enable an api key
+│   │       │   ├── disable.ts   # Disable an api key
+│   │       │   └── ...
 │   │       └── ...
 │   ├── agent-registry-api/      # Server (Next.js or other) with endpoints for agents to report status
 │   │   └── src/
 │   │       ├── api/
 │   │       │   ├── register.ts  # Agent registration endpoint
 │   │       │   ├── heartbeat.ts # Agent heartbeat/status reporting
+│   │       │   └── ...
+│   │       └── ...
+│   ├── agent-data-api/          # Server (Next.js or other) with endpoints for agents to read and write data
+│   │   └── src/
+│   │       ├── api/
+│   │       │   ├── read.ts    # Read data endpoint
+│   │       │   ├── write.ts   # Write data endpoint
 │   │       │   └── ...
 │   │       └── ...
 │   ├── query-strategy/          # Single endpoint server for query strategy agent
@@ -82,9 +103,9 @@ mediapulse/
 
 ## System Components
 
-### Orchestrator (Scheduler)
+### Hermes (Orchestrator/Scheduler)
 
-The **Scheduler/Orchestrator** is **not an agent** but a core system component that orchestrates agent execution. It:
+The **Hermes (Orchestrator/Scheduler)** is **not an agent** but a core system component that orchestrates agent execution. It:
 
 - Discovers agents dynamically from the database
 - **Automatically spawns and manages agent instances** based on demand and load
@@ -95,7 +116,21 @@ The **Scheduler/Orchestrator** is **not an agent** but a core system component t
 - Manages job division (splitting large jobs into smaller sub-jobs)
 - Monitors instance health and automatically replaces failed instances
 
-The orchestrator is a separate service (`apps/scheduler/`) that invokes agents via HTTP endpoints. See [Scheduler/Orchestrator Documentation](./agents/agent-types/agent-scheduler) for details.
+The orchestrator is a separate service (`apps/hermes-scheduler/`) that invokes agents via HTTP endpoints. See [Scheduler/Orchestrator Documentation](./agents/agent-types/agent-scheduler) for details.
+
+### Agent Auth API
+
+The **Agent Auth API** (`apps/agent-auth-api/`) is a server that manages the API keys used by agents to authenticate themselves.
+
+- `POST /api/add/` - Add a new API key
+- `POST /api/delete/` - Delete an API key
+- `POST /api/list/` - List all API keys
+- `POST /api/revoke/` - Revoke an API key
+- `POST /api/rotate/` - Rotate an API key
+- `POST /api/view/` - View an API key
+- `POST /api/update/` - Update an API key
+- `POST /api/enable/` - Enable an API key
+- `POST /api/disable/` - Disable an API key
 
 ### Agent Registry API
 
@@ -113,6 +148,18 @@ The orchestrator uses this API to:
 - Automatically detect and handle failed instances
 
 The Agent Registry API maintains the `AgentInstance` table in the database, which tracks all running agent instances and their status. This enables the orchestrator to make informed decisions about job distribution and instance management.
+
+### Agent Data API
+
+The **Agent Data API** (`apps/agent-data-api/`) is a server that provides endpoints for receiving data from the agents:
+
+- `POST /api/query-strategy/` - The output of the Query Strategy Agent
+- `POST /api/data-collection/` - The output of the Data Collection Agent
+- `POST /api/analysis-agent/` - The output of the Analysis Agent
+- `POST /api/content-generation/` - The output of the Content Generation Agent
+- `POST /api/quality-assurance/` - The output of the Quality Assurance Agent
+- `POST /api/delivery/` - The output of the Delivery Agent
+- `POST /api/learning/` - The output of the Learning Agent
 
 ### Agents
 
@@ -170,6 +217,7 @@ Key entities:
 - `AgentExperiment` - Experimental runs and version comparisons
 - `AgentValidation` - Validation checks before version promotion
 - `AnalysisTypeRegistry` - Registered analysis types and their metadata
+- `APIKey` - API keys used by agents to authenticate themselves
 
 ### Orchestrator Tables
 

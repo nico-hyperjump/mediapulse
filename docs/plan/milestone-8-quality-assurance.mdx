@@ -18,6 +18,19 @@ Implement basic quality checks and compliance validation to ensure newsletter qu
 
 ### Quality Assurance Agent (Basic)
 
+- ✅ **Agent Versioning**:
+  - Reads active version from `AgentVersionDeployment` table during initialization
+  - Includes `agentVersion` field in all outputs
+  - Version information stored in `AgentVersion` table
+- ✅ **Agent Registration**:
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned by orchestrator
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`) with current load and status
+- ✅ **Version-Aware QA**:
+  - Tracks which agent version generated the content being validated
+  - Validates content with awareness of source agent version
+  - Can apply version-specific validation rules
+  - Records validation results with source agent version information
 - ✅ **Basic Quality Checks**:
   - Content completeness (required sections present)
   - Length validation (not too short/long)
@@ -31,9 +44,11 @@ Implement basic quality checks and compliance validation to ensure newsletter qu
   - Pass/fail decision logic
   - Auto-approval for high-quality content
   - Flag for manual review if issues found
+  - Writes approval status via Agent Data API (`POST /api/quality-assurance/`)
+  - Includes `agentVersion` in all outputs
 - ✅ **Integration with Pipeline**:
-  - QA runs after content generation
-  - Can request revision from Content Generation Agent
+  - QA runs after content generation (orchestrator invokes QA HTTP endpoint)
+  - Can request revision from Content Generation Agent (via orchestrator)
   - Blocks delivery if not approved
 
 ### Content Generation Agent (Minor Update)
@@ -41,10 +56,12 @@ Implement basic quality checks and compliance validation to ensure newsletter qu
 - ✅ Handle revision requests from QA
 - ✅ Improve content based on QA feedback
 
-### Scheduler Agent (Update)
+### Hermes Orchestrator (Update)
 
-- ✅ Include QA stage in pipeline
+- ✅ Include QA stage in pipeline (invokes QA Agent HTTP endpoint)
 - ✅ Handle QA approval/rejection flow
+- ✅ Tracks QA job execution in `AgentJobExecution` table
+- ✅ Can trigger Content Generation Agent revision if QA requests it
 
 ## Task Timeline
 
@@ -54,24 +71,29 @@ gantt
     title Milestone 8 - Quality Assurance (Basic)
     dateFormat  YYYY-MM-DD
     section Quality Assurance Agent
-    Content completeness checks              :a1, 2026-04-23, 1d
-    Length validation                       :a2, after a1, 1d
-    Grammar/spelling check                  :a3, after a2, 2d
-    Consistency checking                    :a4, after a3, 1d
-    Disclaimer verification                 :a5, 2026-04-23, 1d
-    Financial advice detection              :a6, after a5, 1d
-    Data attribution verification           :a7, after a6, 1d
-    Pass/fail decision logic                :a8, after a4, 1d
-    Auto-approval system                    :a9, after a8, 1d
-    Manual review flagging                  :a10, after a9, 1d
-    Pipeline integration                    :a11, after a10, 1d
-    Revision request system                 :a12, after a11, 1d
-    Delivery blocking                       :a13, after a12, 1d
+    Agent versioning integration             :a1, 2026-04-23, 1d
+    Agent registration                       :a2, after a1, 1d
+    HTTP endpoint implementation             :a3, after a2, 1d
+    Version-aware QA system                  :a4, after a3, 1d
+    Content completeness checks              :a5, after a4, 1d
+    Length validation                       :a6, after a5, 1d
+    Grammar/spelling check                  :a7, after a6, 2d
+    Consistency checking                    :a8, after a7, 1d
+    Disclaimer verification                 :a9, 2026-04-23, 1d
+    Financial advice detection              :a10, after a9, 1d
+    Data attribution verification           :a11, after a10, 1d
+    Pass/fail decision logic                :a12, after a8, 1d
+    Auto-approval system                    :a13, after a12, 1d
+    Manual review flagging                  :a14, after a13, 1d
+    Agent Data API integration              :a15, after a14, 1d
+    Pipeline integration                    :a16, after a15, 1d
+    Revision request system                 :a17, after a16, 1d
+    Delivery blocking                       :a18, after a17, 1d
     section Content Generation
     Revision request handling               :b1, after a12, 1d
     QA feedback integration                 :b2, after b1, 1d
-    section Scheduler
-    QA stage integration                    :c1, after a11, 1d
+    section Orchestrator
+    QA stage integration                    :c1, after a16, 1d
     Approval/rejection flow                :c2, after c1, 1d
   "
 />
@@ -85,7 +107,11 @@ gantt
 
 ## Success Criteria
 
-- ✅ QA Agent validates newsletter content
+- ✅ Agent versioning is functional for QA Agent (agent reads active version, includes in outputs)
+- ✅ Agent registration is functional (agent registers type and instance, reports heartbeat)
+- ✅ Version-aware QA tracks source agent versions in validation results
+- ✅ QA Agent validates newsletter content via HTTP endpoint
+- ✅ QA writes outputs via Agent Data API with `agentVersion` field
 - ✅ Catches obvious quality issues
 - ✅ Compliance checks work correctly
 - ✅ Approval workflow functions properly

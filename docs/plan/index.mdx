@@ -15,6 +15,9 @@ Since the system is modular, each part can be developed independently. The plan 
 3. **Working System First**: Every milestone produces a functional end-to-end system
 4. **Independent Development**: Components can be developed in parallel when dependencies allow
 5. **Event-Driven Architecture**: Agents run independently on their own schedules, communicating through a shared database and event queue (see [System Flow](/system-flow) for details)
+6. **Orchestrator-Based Execution**: Hermes Orchestrator (not an agent) automatically spawns and manages agent instances, distributes jobs, and handles scaling
+7. **API-First Design**: Agent Auth API, Agent Registry API, and Agent Data API provide standardized interfaces for agent operations
+8. **Version Management**: All agents support versioning with only one active production version per agent type
 
 ## Plan Structure
 
@@ -24,35 +27,35 @@ The development plan is organized into incremental milestones:
 
 Build the simplest working version of the entire pipeline
 
-- **[Milestone 1: Foundation & Basic Pipeline](/plan/milestone-1-foundation)** - Database, basic scheduler, minimal agents
-- **[Milestone 2: First Working Newsletter](/plan/milestone-2-first-newsletter)** - End-to-end newsletter generation with hardcoded data
-- **[Milestone 3: Basic Data Collection](/plan/milestone-3-basic-data)** - Single source data collection
-- **[Milestone 4: Basic Analysis & Content](/plan/milestone-4-basic-analysis)** - Plugin system infrastructure and initial analysis plugins
+- **[Milestone 1: Foundation & Basic Pipeline](/plan/milestone-1-foundation)** - Database, Hermes Orchestrator, API services (Agent Auth, Registry, Data), agent versioning foundation, minimal agents
+- **[Milestone 2: First Working Newsletter](/plan/milestone-2-first-newsletter)** - End-to-end newsletter generation with hardcoded data, agents use Agent Data API, basic agent registration
+- **[Milestone 3: Basic Data Collection](/plan/milestone-3-basic-data)** - Single source data collection with agent versioning and registration
+- **[Milestone 4: Basic Analysis & Content](/plan/milestone-4-basic-analysis)** - Plugin system infrastructure and initial analysis plugins with versioning
 
 ### Phase 2: Core Features (Milestones 5-8)
 
 Enhance each component with core functionality
 
-- **[Milestone 5: Query Strategy (Basic)](/plan/milestone-5-query-strategy)** - Entity discovery and query generation
-- **[Milestone 6: Enhanced Data Collection](/plan/milestone-6-enhanced-data)** - Multiple sources, deduplication, and agent versioning
-- **[Milestone 7: Enhanced Analysis](/plan/milestone-7-enhanced-analysis)** - Additional analysis plugins and enhancements (demonstrates plugin system flexibility)
-- **[Milestone 8: Quality Assurance (Basic)](/plan/milestone-8-quality-assurance)** - Basic validation and compliance
+- **[Milestone 5: Query Strategy (Basic)](/plan/milestone-5-query-strategy)** - Entity discovery and query generation with full agent registration and instance management
+- **[Milestone 6: Enhanced Data Collection](/plan/milestone-6-enhanced-data)** - Multiple sources, deduplication, enhanced agent versioning with rollback, instance scaling
+- **[Milestone 7: Enhanced Analysis](/plan/milestone-7-enhanced-analysis)** - Additional analysis plugins and enhancements with version management for plugins
+- **[Milestone 8: Quality Assurance (Basic)](/plan/milestone-8-quality-assurance)** - Basic validation and compliance with agent versioning and version-aware QA
 
 ### Phase 3: Advanced Features (Milestones 9-12)
 
 Add advanced capabilities and optimizations
 
-- **[Milestone 9: Enhanced Content Generation](/plan/milestone-9-enhanced-content)** - Personalization and A/B testing
-- **[Milestone 10: Advanced Data Collection](/plan/milestone-10-advanced-data)** - Earnings analysis plugin, SEC filings, advanced processing
-- **[Milestone 11: Enhanced Quality Assurance](/plan/milestone-11-enhanced-qa)** - Fact-checking and advanced validation
-- **[Milestone 12: Learning Agent (Basic)](/plan/milestone-12-learning)** - Metrics collection and basic optimization
+- **[Milestone 9: Enhanced Content Generation](/plan/milestone-9-enhanced-content)** - Personalization and A/B testing with version experimentation
+- **[Milestone 10: Advanced Data Collection](/plan/milestone-10-advanced-data)** - Earnings analysis plugin, SEC filings, advanced processing with advanced versioning features
+- **[Milestone 11: Enhanced Quality Assurance](/plan/milestone-11-enhanced-qa)** - Fact-checking and advanced validation with version-aware QA enhancements
+- **[Milestone 12: Learning Agent (Basic)](/plan/milestone-12-learning)** - Metrics collection and basic optimization with version optimization
 
 ### Phase 4: Production Ready (Milestones 13-14)
 
 Production hardening and continuous improvement
 
-- **[Milestone 13: Production Hardening](/plan/milestone-13-production)** - Monitoring, error handling, scalability
-- **[Milestone 14: Advanced Learning](/plan/milestone-14-advanced-learning)** - Advanced analytics and automated optimization
+- **[Milestone 13: Production Hardening](/plan/milestone-13-production)** - Monitoring, error handling, scalability for all API services, orchestrator, and instance management
+- **[Milestone 14: Advanced Learning](/plan/milestone-14-advanced-learning)** - Advanced analytics and automated optimization with advanced version management
 
 ### Supporting Documents
 

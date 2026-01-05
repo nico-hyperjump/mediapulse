@@ -15,6 +15,10 @@ The **Agent Registry API** is a separate service (`apps/agent-registry-api/`) th
 - Support health monitoring and automatic failover
 - Track agent type metadata in the `AgentRegistry` table
 
+## Authentication
+
+The Agent Data API is authenticated using the API keys stored in the `AgentAuth` table. The API key is passed in the `Authorization` header as a Bearer token.
+
 ## Architecture
 
 The Agent Registry API is a server (Next.js or other framework) that exposes REST endpoints. It maintains two key database tables:

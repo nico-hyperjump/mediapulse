@@ -59,6 +59,25 @@ Implement collection and processing of earnings calls and SEC filings for deeper
   - Integration with existing analysis sections
 - ✅ Include earnings insights in newsletter (dynamically when plugin results available)
 - ✅ Reference entity relationships discovered from SEC filings
+- ✅ Continues to use Agent Data API and include `agentVersion` in outputs (already implemented)
+
+### Agent Versioning System (Advanced Features)
+
+- ✅ **Version Analytics**:
+  - Track performance metrics per version (success rate, execution time, output quality)
+  - Version comparison dashboards
+  - Historical version performance trends
+  - Version impact analysis (how version changes affect outcomes)
+- ✅ **Advanced Version Management**:
+  - Version tagging and categorization
+  - Version dependency tracking
+  - Version rollback with data preservation
+  - Version promotion workflows with validation gates
+- ✅ **Version Experimentation Enhancements**:
+  - Canary deployments (gradual rollout of new versions)
+  - A/B testing with multiple versions simultaneously
+  - Statistical significance testing for version comparisons
+  - Automated version performance analysis
 
 ## Task Timeline
 
@@ -94,6 +113,11 @@ gantt
     Earnings section mapping                :d1, after c2, 1d
     Earnings section template               :d2, after d1, 1d
     Entity relationship references          :d3, after c5, 1d
+    section Agent Versioning
+    Version analytics system                :e1, 2026-05-21, 2d
+    Advanced version management             :e2, after e1, 2d
+    Version experimentation enhancements    :e3, after e2, 2d
+    Canary deployment support               :e4, after e3, 1d
   "
 />
 
@@ -112,6 +136,10 @@ gantt
 - ✅ Earnings insights are dynamically included in newsletters (when plugin results available)
 - ✅ Plugin system demonstrates ease of adding new analysis types
 - ✅ Entity discovery improves with filing data
+- ✅ Version analytics system tracks performance metrics per version
+- ✅ Advanced version management features work correctly (tagging, dependencies, rollback)
+- ✅ Canary deployments and A/B testing with multiple versions function properly
+- ✅ All agent outputs include `agentVersion` field for traceability
 
 ## Next Steps
 
