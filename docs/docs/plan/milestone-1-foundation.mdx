@@ -12,7 +12,7 @@ Weeks 1-4
 
 ## Goal
 
-Create the database foundation, basic agent framework, and minimal scheduler that can orchestrate a simple pipeline.
+Create the database foundation, basic agent framework, Hermes Orchestrator, API services (Agent Auth, Registry, Data), agent versioning system, and minimal orchestrator that can discover agents and execute a simple pipeline.
 
 ## Deliverables
 
@@ -27,13 +27,17 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
   - `Newsletter` - Generated newsletters (with `createdAt` timestamp for freshness tracking)
   - `NewsletterContent` - Newsletter content (simple text field)
   - `AgentConfig` - Basic configuration storage
-  - `AgentRegistry` - Agent metadata and registration
+  - `AgentRegistry` - Agent type metadata (not version-specific)
+  - `AgentVersion` - Agent version snapshots and metadata
+  - `AgentVersionDeployment` - Active version tracking (only one version per agentId can be production)
+  - `AgentInstance` - Running agent instance tracking (capacity, load, status)
+  - `AgentJobExecution` - Individual agent job execution tracking
   - `Schedule` - Admin-created schedules
   - `JobTemplate` - Reusable job definitions
   - `Pipeline` - Multi-agent workflow definitions
   - `ScheduleExecution` - Schedule execution history
   - `APIKey` - API keys used by agents to authenticate themselves
-  - Note: Job tracking handled by BullMQ/Redis (no database tables needed for this milestone)
+  - Note: Job tracking also handled by BullMQ/Redis
 - ✅ Database migrations and seed scripts
 - ✅ Redis setup for BullMQ queue system
 - ✅ Environment variable management
@@ -43,36 +47,84 @@ Create the database foundation, basic agent framework, and minimal scheduler tha
 - ✅ Base Agent class with:
   - Error handling
   - Basic logging
-  - Configuration loading from database
-  - Scheduling capability (agents can register their own schedules, but scheduler agent orchestrates pipeline execution)
-- ✅ Agent registry system
-- ✅ Job queue system with BullMQ:
-  - Basic queue setup
-  - Job creation and processing
-  - Simple retry mechanism
-  - Support for independent agent scheduling
+  - Configuration loading from database (`AgentConfig` table)
+  - Agent version reading from `AgentVersionDeployment` table
+  - Version information included in all outputs (`agentVersion` field)
+  - HTTP endpoint exposure (agents are language-agnostic services)
+- ✅ Agent versioning foundation:
+  - Agents read active version from `AgentVersionDeployment` table during initialization
+  - All agent outputs include `agentVersion` field for traceability
+  - Basic version management (create version, deploy to production)
 - ✅ Event-driven communication foundation:
-  - Agents communicate through shared database (not direct calls)
+  - Agents communicate through shared database and Agent Data API (not direct calls)
   - Data timestamping for freshness tracking (using `createdAt`/`updatedAt` fields on data tables)
-  - Agents read from and write to database tables to pass data between stages
+  - Agents read from database and write outputs via Agent Data API
 
-### Scheduler Agent (Minimal)
+### Hermes Orchestrator (Core System Component - Not an Agent)
 
-- ✅ Basic scheduler that can:
+- ✅ Basic orchestrator (`apps/hermes-scheduler/`) that can:
   - Load schedules from database (`Schedule` table)
-  - Load job templates from database (`JobTemplate` table)
   - Load pipelines from database (`Pipeline` table)
   - Discover agents from database (`AgentRegistry` table)
-  - Run on schedules (cron or interval) - configured via admin interface
-  - Create jobs for user-ticker combinations (one job per user-ticker pair) via parameter expansion
+  - Query `AgentVersionDeployment` to determine active production version for each agent
+  - Query `AgentInstance` table to discover available agent instances
+  - Execute schedules (cron, interval, or once) - configured via admin interface
+  - Support data source expansion for any agent parameter (e.g., `db:ticker:all:id?enabled=true`)
   - Execute a simple 3-stage newsletter pipeline sequentially:
-    1. Data Collection (placeholder - returns hardcoded data, stores with timestamp)
-    2. Content Generation (placeholder - generates simple text, reads data from previous stage)
-    3. Delivery (placeholder - saves to database only)
-  - Check data freshness before processing (basic check: checks `DataSource.collectedAt` timestamp for the ticker; if data is older than 4 hours, triggers data collection; also checks if newsletter was already generated recently to avoid duplicates)
-- ✅ Sequential execution (no parallelism yet)
-- ✅ Basic error handling
-- ✅ Database tables: `AgentRegistry`, `Schedule`, `JobTemplate`, `Pipeline`, `ScheduleExecution`
+    1. Data Collection (placeholder - invoked via HTTP endpoint, writes via Agent Data API)
+    2. Content Generation (placeholder - invoked via HTTP endpoint, writes via Agent Data API)
+    3. Delivery (placeholder - invoked via HTTP endpoint, writes via Agent Data API)
+  - Basic instance management:
+    - Spawn agent instances when needed (creates instance records in `AgentInstance` table)
+    - Terminate idle instances
+    - Track instance capacity and current load
+  - Invoke agent HTTP endpoints with proper authentication (API keys from Agent Auth API)
+  - Sequential execution (no parallelism yet)
+  - Basic error handling and retry logic
+- ✅ Long-running BullMQ worker process
+- ✅ Database tables: `AgentRegistry`, `AgentVersion`, `AgentVersionDeployment`, `AgentInstance`, `AgentJobExecution`, `Schedule`, `Pipeline`, `ScheduleExecution`
+
+### Agent Auth API
+
+- ✅ Separate server (`apps/agent-auth-api/`) with basic CRUD endpoints:
+  - `POST /api/add/` - Add a new API key
+  - `POST /api/delete/` - Delete an API key
+  - `POST /api/list/` - List all API keys
+  - `POST /api/view/` - View an API key
+  - `POST /api/update/` - Update an API key
+  - `POST /api/enable/` - Enable an API key
+  - `POST /api/disable/` - Disable an API key
+  - `POST /api/revoke/` - Revoke an API key
+  - `POST /api/rotate/` - Rotate an API key
+- ✅ Authentication endpoint for agents to validate API keys
+- ✅ Integration with `APIKey` database table
+
+### Agent Registry API
+
+- ✅ Separate server (`apps/agent-registry-api/`) with endpoints:
+  - `POST /api/registry/register/` - Register or update agent type metadata
+  - `POST /api/register/` - Register a new agent instance
+  - `POST /api/heartbeat/` - Update instance status and load
+  - `POST /api/deregister/` - Deregister an agent instance
+  - `GET /api/instances/` - Query available agent instances
+  - `GET /api/registry/` - Query agent type registry
+- ✅ Maintains `AgentRegistry` table (agent type metadata)
+- ✅ Maintains `AgentInstance` table (running instance tracking)
+- ✅ Basic health monitoring (heartbeat tracking)
+
+### Agent Data API
+
+- ✅ Separate server (`apps/agent-data-api/`) with write endpoints:
+  - `POST /api/query-strategy/` - Receive output from Query Strategy Agent
+  - `POST /api/data-collection/` - Receive output from Data Collection Agent
+  - `POST /api/analysis-agent/` - Receive output from Analysis Agent
+  - `POST /api/content-generation/` - Receive output from Content Generation Agent
+  - `POST /api/quality-assurance/` - Receive output from Quality Assurance Agent
+  - `POST /api/delivery/` - Receive output from Delivery Agent
+  - `POST /api/learning/` - Receive output from Learning Agent
+- ✅ Authentication using API keys (validates via Agent Auth API)
+- ✅ Basic validation and storage of agent outputs
+- ✅ All outputs include `agentVersion` field for traceability
 
 ### Web Application (Minimal)
 
@@ -105,13 +157,18 @@ gantt
     Environment configuration               :a6, after a1, 1d
     section Agent Framework
     Base Agent class                         :b1, after a3, 4d
-    Agent registry system                    :b2, after b1, 2d
-    BullMQ queue system                      :b3, after a5, 3d
-    Event-driven communication               :b4, after b1, 2d
-    section Scheduler Agent
-    Basic scheduler implementation           :c1, after b3, 3d
-    3-stage pipeline (placeholders)          :c2, after c1, 3d
-    Data freshness checks                    :c3, after c2, 1d
+    Agent versioning foundation              :b2, after b1, 2d
+    Event-driven communication               :b3, after b1, 2d
+    section API Services
+    Agent Auth API                           :c1, after a4, 3d
+    Agent Registry API                       :c2, after c1, 3d
+    Agent Data API                           :c3, after c2, 3d
+    section Hermes Orchestrator
+    Basic orchestrator implementation        :d1, after c3, 4d
+    Agent discovery from AgentRegistry       :d2, after d1, 2d
+    Instance management foundation           :d3, after d2, 2d
+    3-stage pipeline (placeholders)          :d4, after d3, 3d
+    Data freshness checks                    :d5, after d4, 1d
     section Web Application
     Next.js app setup                        :d1, after a2, 2d
     NextAuth.js integration                  :d2, after d1, 2d
@@ -132,17 +189,27 @@ gantt
 - No personalization (same content for all users)
 - Sequential execution only (no parallelism - processes one user-ticker combination at a time)
 - Basic error handling only (errors logged but no retry logic beyond BullMQ defaults)
-- No job status tracking UI (jobs tracked in Redis/BullMQ only)
+- No job status tracking UI (jobs tracked in Redis/BullMQ and `AgentJobExecution` table)
+- Basic instance management only (spawn/terminate, no advanced scaling yet)
+- Agent versioning is basic (create/deploy, no rollback UI yet)
+- API services have minimal validation and error handling
 
 ## Success Criteria
 
-- ✅ Database schema created and migrations run successfully
-- ✅ Scheduler can be triggered manually and runs the 3-stage pipeline end-to-end
-- ✅ Placeholder agents execute and produce output (each stage completes successfully)
+- ✅ Database schema created and migrations run successfully (including versioning tables)
+- ✅ Agent Auth API is functional and can manage API keys
+- ✅ Agent Registry API is functional and can register agent types and instances
+- ✅ Agent Data API is functional and can receive agent outputs
+- ✅ Hermes Orchestrator can discover agents from `AgentRegistry` table
+- ✅ Orchestrator can execute schedules and run the 3-stage pipeline end-to-end
+- ✅ Orchestrator can spawn and track agent instances in `AgentInstance` table
+- ✅ Placeholder agents execute via HTTP endpoints and produce output (each stage completes successfully)
+- ✅ Agents include `agentVersion` in all outputs
+- ✅ Agents write outputs via Agent Data API (not directly to database)
 - ✅ Newsletter is saved to database with correct `userId` association
 - ✅ User can log in via NextAuth.js and see their dashboard
 - ✅ Newsletter appears in user's dashboard (filtered by user, even if content is placeholder)
-- ✅ Data flows correctly between pipeline stages via database (Data Collection → Content Generation → Delivery)
+- ✅ Data flows correctly between pipeline stages via Agent Data API (Data Collection → Content Generation → Delivery)
 
 ## Next Steps
 

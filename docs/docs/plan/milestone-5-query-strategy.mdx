@@ -18,11 +18,22 @@ Add entity discovery and intelligent query generation to improve data collection
 
 ### Query Strategy Agent (Basic)
 
-- ✅ **Independent Scheduling**:
-  - Runs on its own schedule:
+- ✅ **Agent Versioning**:
+  - Reads active version from `AgentVersionDeployment` table during initialization
+  - Includes `agentVersion` field in all outputs
+  - Version information stored in `AgentVersion` table
+- ✅ **Full Agent Registration**:
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned by orchestrator
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`) with current load, capacity, and status
+  - Updates capacity and load information in real-time
+  - Supports multiple instances running in parallel (orchestrator manages instances)
+- ✅ **Orchestrator-Triggered Execution**:
+  - Runs on schedule created by admin:
     - Entity Refresh: Weekly (configurable per ticker) - updates basic entity list
     - Query Optimization: Daily (analyzes previous day's query performance) - basic performance tracking only in this milestone, full optimization in later milestones
     - Query Generation: On-demand or when entity list updates
+  - Orchestrator invokes agent HTTP endpoint with job parameters
   - Operates independently - Data Collection Agent reads queries from database
 - ✅ **Basic Entity Discovery**:
   - Company name extraction from ticker
@@ -32,10 +43,12 @@ Add entity discovery and intelligent query generation to improve data collection
   - Generate queries from ticker + basic entities
   - Multiple query variants (5+ per ticker)
   - Query prioritization (simple scoring based on entity relevance)
-- ✅ **Database Integration**:
+- ✅ **Database Integration via Agent Data API**:
+  - Writes queries and entities via `POST /api/query-strategy/` endpoint
   - Store queries in database (available for Data Collection Agent)
   - Store discovered entities in database (simple flat structure, not a graph)
   - Link entities to tickers
+  - Includes `agentVersion` in all outputs
   - Data Collection Agent reads latest queries from database (replaces hardcoded queries from Milestone 3)
 
 ### Data Collection Agent (Enhanced)
@@ -44,6 +57,8 @@ Add entity discovery and intelligent query generation to improve data collection
 - ✅ Execute multiple queries per ticker (reads from database)
 - ✅ Merge results from different queries
 - ✅ Basic query performance tracking (tracks which queries return results, stores feedback for future optimization)
+- ✅ Continues to use Agent Data API for writing outputs (already implemented in Milestone 3)
+- ✅ Continues agent versioning and registration (already implemented in Milestone 3)
 
 ## Task Timeline
 
@@ -53,19 +68,25 @@ gantt
     title Milestone 5 - Query Strategy (Basic)
     dateFormat  YYYY-MM-DD
     section Query Strategy Agent
-    Independent scheduling setup             :a1, 2026-03-12, 2d
-    Company name extraction                 :a2, after a1, 1d
-    Competitor identification               :a3, after a2, 2d
-    Query generation logic                  :a4, after a3, 2d
-    Query prioritization                    :a5, after a4, 1d
-    Database schema for queries             :a6, 2026-03-12, 1d
-    Entity storage structure (flat)         :a7, after a6, 1d
-    Query storage & retrieval               :a8, after a7, 1d
+    Agent versioning integration             :a1, 2026-03-12, 1d
+    Full agent registration                  :a2, after a1, 1d
+    Heartbeat & load reporting               :a3, after a2, 1d
+    HTTP endpoint implementation             :a4, after a3, 1d
+    Company name extraction                 :a5, after a4, 1d
+    Competitor identification               :a6, after a5, 2d
+    Query generation logic                  :a7, after a6, 2d
+    Query prioritization                    :a8, after a7, 1d
+    Database schema for queries             :a9, 2026-03-12, 1d
+    Entity storage structure (flat)         :a10, after a9, 1d
+    Agent Data API integration              :a11, after a10, 1d
     section Data Collection Agent
-    Query reading from database              :b1, after a8, 1d
+    Query reading from database              :b1, after a11, 1d
     Multiple query execution                :b2, after b1, 2d
     Result merging                          :b3, after b2, 1d
     Query performance tracking              :b4, after b3, 1d
+    section Orchestrator
+    Instance management enhancement         :c1, after a11, 2d
+    Load balancing implementation            :c2, after c1, 2d
   "
 />
 
@@ -79,8 +100,13 @@ gantt
 
 ## Success Criteria
 
+- ✅ Agent versioning is functional for Query Strategy Agent (agent reads active version, includes in outputs)
+- ✅ Full agent registration is functional (agent registers type and instance, reports heartbeat with load)
+- ✅ Orchestrator can spawn and manage multiple Query Strategy Agent instances
+- ✅ Orchestrator distributes jobs across instances using load balancing
 - ✅ Query Strategy Agent discovers basic entities for test tickers
 - ✅ Generates 5+ relevant queries per ticker
+- ✅ Queries and entities are stored via Agent Data API with `agentVersion` field
 - ✅ Data collection uses queries and collects more relevant data
 - ✅ Newsletter quality improves (more relevant articles)
 - ✅ Entities are stored and can be retrieved

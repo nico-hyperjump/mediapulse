@@ -18,20 +18,31 @@ Implement real data collection from one reliable source (NewsAPI) to replace har
 
 ### Data Collection Agent (Enhanced)
 
-- ✅ **Independent Scheduling**:
-  - Runs on its own schedule (every 2-4 hours by default, configurable per ticker)
-  - Operates independently - doesn't wait for other agents or scheduler
-  - Can also be triggered by Scheduler Agent if data is stale during newsletter generation
+- ✅ **Agent Versioning**:
+  - Reads active version from `AgentVersionDeployment` table during initialization
+  - Includes `agentVersion` field in all outputs
+  - Version information stored in `AgentVersion` table
+- ✅ **Agent Registration**:
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned by orchestrator
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`) with current load and status
+  - Updates capacity and load information in real-time
+- ✅ **Orchestrator-Triggered Execution**:
+  - Runs on schedule created by admin (every 2-4 hours by default, configurable per ticker)
+  - Orchestrator invokes agent HTTP endpoint with job parameters
+  - Can also be triggered by orchestrator if data is stale during newsletter generation
   - Uses hardcoded query mapping (ticker → company name) stored in code for this milestone
 - ✅ **NewsAPI integration**:
   - API client setup with authentication
   - Query string construction from ticker (e.g., "AAPL" → "Apple Inc" → NewsAPI search query)
   - Article fetching and parsing (title, URL, description, published date)
   - Rate limiting handling (respects NewsAPI rate limits)
-- ✅ Data storage to `DataSource` table:
+- ✅ Data storage via Agent Data API:
+  - Writes collected data via `POST /api/data-collection/` endpoint
   - News articles with metadata (title, url, snippet/description, publishedAt, collectedAt)
   - Timestamps for freshness tracking
   - Links to `tickerId` for association
+  - Includes `agentVersion` in all outputs
 - ✅ Basic deduplication:
   - URL-based deduplication (exact match)
   - Title similarity (simple string matching, case-insensitive)
@@ -39,6 +50,7 @@ Implement real data collection from one reliable source (NewsAPI) to replace har
   - API failure handling
   - Retry logic with exponential backoff
   - Graceful degradation (continues with partial data if API fails partially)
+  - Updates `AgentJobExecution` table with status and errors
 
 ### Query Strategy (Minimal - Hardcoded)
 
@@ -58,15 +70,18 @@ gantt
     title Milestone 3 - Basic Data Collection
     dateFormat  YYYY-MM-DD
     section Data Collection Agent
-    Independent scheduling implementation     :a1, 2026-02-12, 2d
-    NewsAPI client setup                     :a2, 2026-02-12, 2d
-    Ticker to query string mapping           :a3, after a2, 1d
-    Article fetching & parsing               :a4, after a3, 2d
-    Rate limiting handling                   :a5, after a4, 1d
-    DataSource table integration             :a6, after a4, 1d
-    URL-based deduplication                  :a7, after a6, 1d
-    Title similarity matching                :a8, after a7, 1d
-    Error handling & retries                 :a9, after a5, 2d
+    Agent versioning integration             :a1, 2026-02-12, 1d
+    Agent registration enhancement           :a2, after a1, 1d
+    Heartbeat reporting                      :a3, after a2, 1d
+    NewsAPI client setup                     :a4, 2026-02-12, 2d
+    Ticker to query string mapping           :a5, after a4, 1d
+    Article fetching & parsing               :a6, after a5, 2d
+    Rate limiting handling                   :a7, after a6, 1d
+    Agent Data API integration              :a8, after a6, 1d
+    URL-based deduplication                  :a9, after a8, 1d
+    Title similarity matching                :a10, after a9, 1d
+    Error handling & retries                 :a11, after a7, 2d
+    Job execution tracking                   :a12, after a11, 1d
     section Query Strategy
     Hardcoded ticker-to-company mapping      :b1, 2026-02-12, 1d
     Query string template creation           :b2, after b1, 1d
@@ -86,13 +101,17 @@ gantt
 
 ## Success Criteria
 
+- ✅ Agent versioning is functional (agent reads active version, includes in outputs)
+- ✅ Agent registration is functional (agent registers type and instance, reports heartbeat)
 - ✅ Collects 10+ real news articles per company per day (cumulative across all collection runs)
-- ✅ Data is stored correctly in `DataSource` table with proper ticker associations
+- ✅ Data is stored correctly in `DataSource` table via Agent Data API with proper ticker associations
+- ✅ All outputs include `agentVersion` field
 - ✅ Deduplication removes obvious duplicates (same URL or very similar titles)
 - ✅ Newsletter content uses real collected data (not mock data)
 - ✅ System handles API failures gracefully (retries, continues with partial data)
-- ✅ Independent scheduling works (agent runs every 2-4 hours without scheduler trigger)
-- ✅ Scheduler can trigger immediate data collection if data is stale during newsletter generation
+- ✅ Orchestrator can trigger data collection on schedule (every 2-4 hours)
+- ✅ Orchestrator can trigger immediate data collection if data is stale during newsletter generation
+- ✅ Job execution is tracked in `AgentJobExecution` table
 
 ## Next Steps
 

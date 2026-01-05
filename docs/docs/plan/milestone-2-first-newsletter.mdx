@@ -18,27 +18,36 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 
 ### Data Collection Agent (Minimal)
 
-- ✅ Basic Data Collection Agent that:
-  - Accepts ticker as input
+- ✅ Basic Data Collection Agent (`apps/data-collection/`) that:
+  - Exposes HTTP endpoint (POST) for job execution
+  - Accepts ticker as input via HTTP request
   - Returns hardcoded sample data (3-5 news articles)
-  - Stores data in `DataSource` table (table created in this milestone)
-  - Returns structured data for next stage
+  - Writes data to `DataSource` table via Agent Data API (`POST /api/data-collection/`)
+  - Includes `agentVersion` field in all outputs (read from `AgentVersionDeployment` table)
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`)
 - ✅ Simple data structure:
   - News articles (title, url, snippet)
 - ✅ No external API calls yet (uses mock data)
 - ✅ `DataSource` table schema:
-  - Basic fields: `id`, `tickerId`, `type` (e.g., 'news'), `title`, `url`, `snippet`, `collectedAt`, `createdAt`
+  - Basic fields: `id`, `tickerId`, `type` (e.g., 'news'), `title`, `url`, `snippet`, `collectedAt`, `createdAt`, `agentVersion`
 
 ### Content Generation Agent (Minimal)
 
-- ✅ Basic Content Generation Agent that:
-  - Accepts collected data (reads from `DataSource` table) and user preferences
+- ✅ Basic Content Generation Agent (`apps/content-generation/`) that:
+  - Exposes HTTP endpoint (POST) for job execution
+  - Accepts collected data (reads from `DataSource` table) and user preferences via HTTP request
   - Uses OpenAI API to generate simple newsletter:
     - Executive summary (2-3 sentences)
     - Top 3 news items with brief summaries
-  - Stores newsletter in database:
+  - Writes newsletter to database via Agent Data API (`POST /api/content-generation/`):
     - Creates `Newsletter` record with `userId` and `tickerId`
     - Creates `NewsletterContent` record with generated HTML content
+  - Includes `agentVersion` field in all outputs (read from `AgentVersionDeployment` table)
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`)
 - ✅ Simple prompt template (no personalization yet)
 - ✅ Basic HTML email template (text-only, no styling)
 - ✅ AI integration package (`packages/ai/`) with:
@@ -48,24 +57,33 @@ Create the first end-to-end working newsletter using hardcoded/simple data sourc
 
 ### Delivery Agent (Minimal)
 
-- ✅ Basic Delivery Agent that:
+- ✅ Basic Delivery Agent (`apps/delivery/`) that:
+  - Exposes HTTP endpoint (POST) for job execution
   - Verifies newsletter is properly associated with user (ensures `Newsletter.userId` is set correctly)
   - Ensures newsletter is ready for dashboard display (content exists in `NewsletterContent`)
+  - Writes delivery status via Agent Data API (`POST /api/delivery/`)
+  - Includes `agentVersion` field in all outputs (read from `AgentVersionDeployment` table)
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`)
   - **No email sending yet** (only dashboard delivery)
   - **No status field needed yet** (newsletters are immediately available once created)
 - ✅ Newsletter accessible via dashboard (users can view newsletters filtered by their `userId`)
 
-### Scheduler Agent (Update)
+### Hermes Orchestrator (Update)
 
-- ✅ Newsletter pipeline triggered by scheduler:
+- ✅ Newsletter pipeline triggered by orchestrator:
   - Pipeline defined in `Pipeline` table (admin-configurable)
   - Schedule created in `Schedule` table (admin-configurable timing: cron, interval, or on-demand)
   - User-defined schedules supported (per newsletter via `UserTicker` configuration)
+  - Orchestrator invokes agent HTTP endpoints (not direct calls)
+  - Agents authenticate using API keys from Agent Auth API
   - Checks data freshness before processing:
     - Checks `DataSource.collectedAt` timestamp for the ticker (data freshness check)
-    - If data is stale (older than 4 hours), triggers immediate data collection
+    - If data is stale (older than 4 hours), triggers immediate data collection via HTTP endpoint
     - Also checks if newsletter was already generated recently for this user-ticker to avoid duplicates
     - If data is fresh and no recent newsletter exists, proceeds with pipeline
+  - Tracks job execution in `AgentJobExecution` table
 
 ### Web Dashboard Updates
 
@@ -82,22 +100,33 @@ gantt
     dateFormat  YYYY-MM-DD
     section Data Collection Agent
     DataSource table creation                :a1, 2026-01-29, 1d
-    Data Collection Agent (mock data)        :a2, after a1, 3d
-    DataSource table integration             :a3, after a2, 1d
+    HTTP endpoint implementation             :a2, after a1, 1d
+    Agent versioning integration             :a3, after a2, 1d
+    Agent registration                       :a4, after a3, 1d
+    Data Collection Agent (mock data)        :a5, after a4, 2d
+    Agent Data API integration              :a6, after a5, 1d
     section AI Integration
     AI package setup                         :b1, 2026-01-29, 2d
     OpenAI client wrapper                    :b2, after b1, 2d
     Retry logic & token tracking             :b3, after b2, 1d
     section Content Generation
-    Content Generation Agent                 :c1, after a3, 3d
-    Prompt template creation                 :c2, after c1, 1d
-    HTML email template                      :c3, after c2, 1d
+    HTTP endpoint implementation             :c1, after a6, 1d
+    Agent versioning integration             :c2, after c1, 1d
+    Agent registration                       :c3, after c2, 1d
+    Content Generation Agent                 :c4, after c3, 2d
+    Prompt template creation                 :c5, after c4, 1d
+    HTML email template                      :c6, after c5, 1d
+    Agent Data API integration              :c7, after c6, 1d
     section Delivery Agent
-    Delivery Agent implementation            :d1, after c3, 2d
-    Newsletter status updates                :d2, after d1, 1d
-    section Scheduler Updates
-    Pipeline integration                     :e1, after c3, 2d
-    Schedule configuration                   :e2, after e1, 1d
+    HTTP endpoint implementation             :d1, after c7, 1d
+    Agent versioning integration             :d2, after d1, 1d
+    Agent registration                       :d3, after d2, 1d
+    Delivery Agent implementation            :d4, after d3, 1d
+    Agent Data API integration              :d5, after d4, 1d
+    section Orchestrator Updates
+    HTTP agent invocation                    :e1, after c7, 2d
+    Pipeline integration                     :e2, after e1, 1d
+    Schedule configuration                   :e3, after e2, 1d
     section Web Dashboard
     Newsletter detail page                   :f1, after c3, 2d
     Newsletter list view                    :f2, after f1, 1d
@@ -118,10 +147,15 @@ gantt
 ## Success Criteria
 
 - ✅ `DataSource` table created and migrations run successfully
-- ✅ Scheduler runs and produces a newsletter end-to-end
+- ✅ All agents expose HTTP endpoints and can be invoked by orchestrator
+- ✅ All agents register themselves via Agent Registry API
+- ✅ All agents include `agentVersion` in outputs
+- ✅ All agents write outputs via Agent Data API (not directly to database)
+- ✅ Orchestrator can invoke agent HTTP endpoints and execute pipeline
+- ✅ Orchestrator runs and produces a newsletter end-to-end
 - ✅ Newsletter contains real AI-generated content (not placeholders)
 - ✅ Newsletter is saved to database with proper structure (`Newsletter` and `NewsletterContent` tables)
-- ✅ Data flows correctly: Data Collection → stores in `DataSource` → Content Generation reads from `DataSource` → stores in `Newsletter`/`NewsletterContent` → Delivery marks as ready
+- ✅ Data flows correctly: Orchestrator → Data Collection (HTTP) → Agent Data API → `DataSource` → Orchestrator → Content Generation (HTTP) → Agent Data API → `Newsletter`/`NewsletterContent` → Orchestrator → Delivery (HTTP) → Agent Data API
 - ✅ User can view newsletter in dashboard (filtered by `userId`)
 - ✅ Content is readable and relevant (even if from mock data)
 - ✅ System can generate newsletters for multiple users/tickers

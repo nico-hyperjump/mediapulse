@@ -18,20 +18,34 @@ Implement comprehensive fact-checking and advanced quality validation.
 
 ### Quality Assurance Agent (Enhanced)
 
+- ✅ **Version-Aware QA Enhancements**:
+  - Track quality metrics per agent version
+  - Version-specific quality patterns (identify version-related issues)
+  - Compare quality scores across versions
+  - Version-aware validation rules (different rules for experimental vs production versions)
+  - Quality regression detection (identify when new version introduces quality issues)
+  - Version performance correlation (link quality issues to specific agent versions)
 - ✅ **Fact-Checking System**:
   - Claim extraction from newsletter content
   - Cross-reference with source data
   - Number verification (prices, metrics, dates)
   - Quote and attribution verification
   - AI-powered complex claim verification
+  - Fact-checking results linked to source agent version
 - ✅ **Advanced Quality Assessment**:
   - Readability analysis
   - Consistency check (contradiction detection)
   - Overall quality score calculation
+  - Quality scores tracked per agent version
 - ✅ **Issue Resolution**:
   - Automated fix suggestions
   - Severity classification
   - Recommendation generation
+  - Version-specific recommendations (suggest version rollback if quality degrades)
+- ✅ **Agent Data API Integration**:
+  - Writes QA results via `POST /api/quality-assurance/` endpoint
+  - Includes `agentVersion` in all outputs
+  - Tracks source agent version in validation results
 
 ### Content Generation Agent (Update)
 
@@ -46,17 +60,21 @@ gantt
     title Milestone 11 - Enhanced Quality Assurance
     dateFormat  YYYY-MM-DD
     section Quality Assurance Agent
-    Claim extraction                        :a1, 2026-06-04, 2d
-    Source data cross-referencing           :a2, after a1, 2d
-    Number verification                     :a3, after a2, 2d
-    Quote & attribution verification        :a4, after a3, 1d
-    AI complex claim verification            :a5, after a4, 2d
-    Readability analysis                    :a6, 2026-06-04, 2d
-    Consistency checking                    :a7, after a6, 1d
-    Quality score calculation               :a8, after a7, 1d
-    Automated fix suggestions                :a9, after a5, 2d
-    Severity classification                 :a10, after a9, 1d
-    Recommendation generation               :a11, after a10, 1d
+    Version-aware QA enhancements           :a1, 2026-06-04, 2d
+    Version quality tracking                :a2, after a1, 1d
+    Version-specific validation rules       :a3, after a2, 1d
+    Claim extraction                        :a4, after a3, 2d
+    Source data cross-referencing           :a5, after a4, 2d
+    Number verification                     :a6, after a5, 2d
+    Quote & attribution verification        :a7, after a6, 1d
+    AI complex claim verification            :a8, after a7, 2d
+    Readability analysis                    :a9, 2026-06-04, 2d
+    Consistency checking                    :a10, after a9, 1d
+    Quality score calculation               :a11, after a10, 1d
+    Automated fix suggestions                :a12, after a8, 2d
+    Severity classification                 :a13, after a12, 1d
+    Recommendation generation               :a14, after a13, 1d
+    Version performance correlation         :a15, after a14, 1d
     section Content Generation
     Enhanced QA feedback usage               :b1, after a11, 1d
     Fact-checking result integration        :b2, after b1, 1d
@@ -71,11 +89,17 @@ gantt
 
 ## Success Criteria
 
+- ✅ Version-aware QA tracks quality metrics per agent version
+- ✅ Version-specific validation rules work correctly
+- ✅ Quality regression detection identifies version-related issues
+- ✅ QA results are linked to source agent versions
 - ✅ Detects 90%+ of factual errors
 - ✅ Verifies numbers and dates accurately
 - ✅ Provides actionable fix suggestions
 - ✅ Quality scores correlate with manual review
 - ✅ Newsletter accuracy improves
+- ✅ All QA outputs include `agentVersion` field
+- ✅ Version performance correlation helps identify problematic versions
 
 ## Next Steps
 

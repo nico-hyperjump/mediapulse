@@ -28,6 +28,14 @@ Enhance content generation with personalization, A/B testing framework, and bett
   - Content structure variations
   - Style variations
   - Variant assignment tracking
+- ✅ **Version Experimentation**:
+  - A/B testing with different agent versions
+  - Run experimental agent versions alongside production version
+  - Track which version generated which newsletter variant
+  - Compare performance metrics between versions
+  - Use `AgentExperiment` table to track version comparisons
+  - Orchestrator can route jobs to experimental versions for testing
+  - Version performance metrics stored for analysis
 - ✅ **Improved Templates**:
   - Enhanced HTML email template (responsive design)
   - Better visual formatting
@@ -43,9 +51,11 @@ Enhance content generation with personalization, A/B testing framework, and bett
 ### Database Updates
 
 - ✅ User preferences table (if not already exists)
-- ✅ A/B test configuration and results tracking
+- ✅ A/B test configuration and results tracking (`ABTest` table)
 - ✅ Section feedback table (sectionId, userId, newsletterId, feedbackType, feedbackValue, timestamp)
 - ✅ Feedback analytics tables for tracking section-level engagement
+- ✅ Version experimentation tracking (`AgentExperiment` table - already exists from Milestone 6)
+- ✅ Link newsletter variants to agent versions for comparison
 
 ### Web Dashboard Updates
 
@@ -79,13 +89,15 @@ gantt
     Content structure variations             :a6, after a5, 2d
     Style variations                         :a7, after a6, 1d
     Variant assignment tracking              :a8, after a7, 1d
-    Responsive HTML template                 :a9, 2026-05-07, 2d
-    Visual formatting improvements          :a10, after a9, 1d
-    Chart data generation                    :a11, after a10, 1d
-    Dashboard template updates               :a12, after a11, 1d
-    Section identification                  :a13, after a4, 1d
-    Feedback button embedding                :a14, after a13, 1d
-    Feedback API endpoints                   :a15, after a14, 2d
+    Version experimentation system           :a9, after a8, 2d
+    Version comparison tracking              :a10, after a9, 1d
+    Responsive HTML template                 :a11, 2026-05-07, 2d
+    Visual formatting improvements          :a12, after a11, 1d
+    Chart data generation                    :a13, after a12, 1d
+    Dashboard template updates               :a14, after a13, 1d
+    Section identification                  :a15, after a4, 1d
+    Feedback button embedding                :a16, after a15, 1d
+    Feedback API endpoints                   :a17, after a16, 2d
     section Database
     User preferences table                   :b1, 2026-05-07, 1d
     A/B test tables                          :b2, after b1, 1d
@@ -119,11 +131,15 @@ gantt
 - ✅ Personalization reflects user preferences
 - ✅ Different users receive different content styles
 - ✅ A/B test variants are properly assigned
+- ✅ Version experimentation works (experimental versions can run alongside production)
+- ✅ Newsletter variants are linked to agent versions for comparison
+- ✅ Version performance metrics are tracked in `AgentExperiment` table
 - ✅ Email templates render correctly
 - ✅ User preferences are saved and applied
 - ✅ Feedback buttons appear in each newsletter section
 - ✅ Feedback submissions are successfully recorded
 - ✅ Feedback is tracked per section and per user
+- ✅ All outputs include `agentVersion` field for version tracking
 
 ## Next Steps
 

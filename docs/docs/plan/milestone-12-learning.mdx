@@ -18,9 +18,18 @@ Add metrics collection and basic optimization capabilities.
 
 ### Learning Agent (Basic)
 
-- ✅ **Independent Scheduling**:
+- ✅ **Agent Versioning**:
+  - Reads active version from `AgentVersionDeployment` table during initialization
+  - Includes `agentVersion` field in all outputs
+  - Version information stored in `AgentVersion` table
+- ✅ **Agent Registration**:
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned by orchestrator
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`) with current load and status
+- ✅ **Orchestrator-Triggered Execution**:
   - Schedule created by admin via admin interface (stored in `Schedule` table)
   - Example: Daily at midnight schedule
+  - Orchestrator invokes agent HTTP endpoint with job parameters
   - Operates independently - analyzes all metrics from previous day
 - ✅ **Metrics Collection**:
   - Engagement metrics (opens, clicks, time spent)
@@ -28,6 +37,7 @@ Add metrics collection and basic optimization capabilities.
   - **Section-level feedback analysis** (analyzes feedback collected in Milestone 9 - Like/Dislike, Useful/Irrelevant per section)
   - Newsletter performance tracking
   - Agent performance metrics
+  - **Version performance metrics** (tracks performance per agent version)
 - ✅ **Basic Analysis**:
   - Engagement rate calculations
   - Trend detection
@@ -36,11 +46,26 @@ Add metrics collection and basic optimization capabilities.
     - Identify sections with high/low feedback scores
     - Correlate feedback with content types and topics
     - Track feedback trends over time
+  - **Version Performance Analysis**:
+    - Compare performance across agent versions
+    - Identify best-performing versions
+    - Detect version-related performance regressions
+    - Correlate version changes with outcome improvements
+- ✅ **Version Optimization**:
+  - Analyze version performance data from `AgentExperiment` table
+  - Recommend version promotions based on performance metrics
+  - Suggest version rollbacks if performance degrades
+  - Track version impact on key metrics (engagement, quality, accuracy)
 - ✅ **Optimization Recommendations**:
   - Basic config optimization suggestions
   - Simple A/B test analysis
   - Performance improvement recommendations
-  - Updates agent configs in database (hot-reloadable)
+  - Updates agent configs in database (`AgentConfig` table - hot-reloadable)
+  - Version-specific optimization recommendations
+- ✅ **Agent Data API Integration**:
+  - Writes learning results via `POST /api/learning/` endpoint
+  - Includes `agentVersion` in all outputs
+  - Writes version performance analysis to database
 
 ### Database Updates
 
@@ -69,8 +94,11 @@ gantt
     title Milestone 12 - Learning Agent (Basic)
     dateFormat  YYYY-MM-DD
     section Learning Agent
-    Independent scheduling setup             :la1, 2026-06-18, 1d
-    Engagement metrics collection            :la2, 2026-06-19, 2d
+    Agent versioning integration             :la1, 2026-06-18, 1d
+    Agent registration                       :la2, after la1, 1d
+    HTTP endpoint implementation             :la3, after la2, 1d
+    Orchestrator-triggered execution         :la4, after la3, 1d
+    Engagement metrics collection            :la5, 2026-06-19, 2d
     User feedback collection                :la3, 2026-06-21, 1d
     Section level feedback collection        :la4, 2026-06-22, 1d
     Newsletter performance tracking          :la5, 2026-06-23, 1d
@@ -81,10 +109,13 @@ gantt
     Section feedback analysis               :la10, 2026-06-23, 2d
     Feedback correlation                    :la11, 2026-06-25, 1d
     Feedback trend tracking                 :la12, 2026-06-26, 1d
-    Config optimization suggestions         :la13, 2026-06-25, 2d
-    AB test analysis                        :la14, 2026-06-27, 1d
-    Performance recommendations             :la15, 2026-06-28, 1d
-    Config hot reload updates               :la16, 2026-06-29, 1d
+    Version performance analysis            :la13, 2026-06-25, 2d
+    Version optimization recommendations    :la14, after la13, 1d
+    Config optimization suggestions         :la15, 2026-06-25, 2d
+    AB test analysis                        :la16, 2026-06-27, 1d
+    Performance recommendations             :la17, 2026-06-28, 1d
+    Config hot reload updates               :la18, 2026-06-29, 1d
+    Agent Data API integration              :la19, after la18, 1d
     section Database
     User feedback table                     :db1, 2026-06-18, 1d
     Section feedback analytics views        :db2, 2026-06-19, 1d
@@ -111,12 +142,18 @@ gantt
 
 ## Success Criteria
 
+- ✅ Agent versioning is functional for Learning Agent (agent reads active version, includes in outputs)
+- ✅ Agent registration is functional (agent registers type and instance, reports heartbeat)
 - ✅ Collects engagement metrics accurately
 - ✅ Tracks user feedback (including section-level feedback)
 - ✅ Analyzes section feedback patterns
+- ✅ Version performance analysis works correctly (compares versions, identifies best performers)
+- ✅ Version optimization recommendations are generated
 - ✅ Generates basic optimization recommendations
 - ✅ A/B test results are tracked
 - ✅ Metrics dashboard displays data correctly
+- ✅ All outputs include `agentVersion` field
+- ✅ Learning results written via Agent Data API
 
 ## Next Steps
 

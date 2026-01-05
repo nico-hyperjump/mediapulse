@@ -18,25 +18,41 @@ Build the plugin-based analysis system infrastructure and implement initial anal
 
 ### Analysis Agent (Plugin System Foundation)
 
+- ✅ **Agent Versioning**:
+  - Reads active version from `AgentVersionDeployment` table during initialization
+  - Includes `agentVersion` field in all outputs
+  - Version information stored in `AgentVersion` table
+- ✅ **Agent Registration**:
+  - Registers agent type metadata via Agent Registry API (`POST /api/registry/register/`)
+  - Registers instance via Agent Registry API (`POST /api/register/`) when spawned by orchestrator
+  - Reports heartbeat via Agent Registry API (`POST /api/heartbeat/`) with current load and status
 - ✅ **Plugin System Infrastructure**:
   - Analysis plugin interface definition
-  - Plugin registry system (`AnalysisTypeRegistry` table)
-  - Dynamic plugin loading mechanism
-  - Plugin configuration system
+  - Plugin registry system (`AnalysisTypeRegistry` table) - stores plugin metadata in database
+  - Dynamic plugin loading mechanism:
+    - Queries `AnalysisTypeRegistry` for enabled plugins
+    - Maps registry IDs to code locations (convention: `plugins/{pluginId}/index.ts`)
+    - Dynamically imports plugin code from codebase (not from database)
+    - Validates plugin implements `AnalysisPlugin` interface
+  - Plugin configuration system (loaded from `AgentConfig` table)
   - Generic analysis result storage structure
-- ✅ **Initial Analysis Plugins**:
-  - **Sentiment Analysis Plugin**:
+- ✅ **Initial Analysis Plugins** (code in `apps/analysis-agent/src/plugins/`):
+  - **Sentiment Analysis Plugin** (`plugins/sentiment/`):
     - AI-powered sentiment analysis of news articles
     - Aggregate sentiment score (positive/negative/neutral)
     - Simple sentiment trend (improving/declining/stable)
-  - **Basic Event/Context Analysis Plugin**:
+    - Registered in `AnalysisTypeRegistry` table
+  - **Basic Event/Context Analysis Plugin** (`plugins/event/`):
     - Identify external events mentioned in media (natural disasters, political changes, regulatory updates)
     - Basic relevance scoring for events
     - Simple impact assessment (high/medium/low)
-- ✅ Analysis result storage:
+    - Registered in `AnalysisTypeRegistry` table
+- ✅ Analysis result storage via Agent Data API:
+  - Writes analysis results via `POST /api/analysis-agent/` endpoint
   - Generic storage structure supporting any plugin output
   - Store analysis results in database with plugin metadata
   - Link to source data
+  - Includes `agentVersion` in all outputs
 - ✅ Simple insight extraction:
   - Cross-plugin insight identification
   - Identify top 3 insights from all analysis plugins
@@ -44,6 +60,11 @@ Build the plugin-based analysis system infrastructure and implement initial anal
 
 ### Content Generation Agent (Enhanced)
 
+- ✅ **Agent Versioning** (already implemented in Milestone 2, enhanced here):
+  - Reads active version from `AgentVersionDeployment` table
+  - Includes `agentVersion` field in all outputs
+- ✅ **Agent Registration** (already implemented in Milestone 2, enhanced here):
+  - Continues to register and report heartbeat
 - ✅ Dynamic section generation system:
   - Section mapping configuration for analysis plugins
   - Dynamic section resolution based on available analysis results
@@ -62,12 +83,16 @@ Build the plugin-based analysis system infrastructure and implement initial anal
   - Structured sections with dynamic content
   - Improved HTML template (basic styling)
   - Basic template system for plugin-specific sections (simple string interpolation, advanced templating in later milestones)
+- ✅ Writes newsletter via Agent Data API:
+  - Uses `POST /api/content-generation/` endpoint (already implemented in Milestone 2)
+  - Includes `agentVersion` in all outputs
 
 ### Database Updates
 
 - ✅ Add `AnalysisTypeRegistry` table for plugin registration:
-  - Stores plugin metadata (name, version, enabled status, configuration)
-  - Links to plugin implementation code
+  - Stores plugin metadata (id, name, version, enabled status, configSchema, outputSchema, sectionTemplate)
+  - Plugin implementation code must exist in codebase (`apps/analysis-agent/src/plugins/{pluginId}/`)
+  - Database registry controls which plugins are active, but does not store executable code
 - ✅ Add generic analysis result storage (supports any plugin output structure):
   - Stores analysis results with plugin type reference
   - Links to source data via foreign keys
@@ -79,12 +104,13 @@ Build the plugin-based analysis system infrastructure and implement initial anal
   - Plugin-specific settings (e.g., sentiment thresholds, event relevance scores)
   - Per-ticker plugin enablement flags
 
-### Scheduler Agent (Update)
+### Hermes Orchestrator (Update)
 
 - ✅ Newsletter pipeline enhancements:
   - Checks data freshness before triggering analysis
-  - Can trigger immediate data collection if data is stale (> 4 hours old)
-  - Triggers Analysis Agent after data freshness check
+  - Can trigger immediate data collection if data is stale (> 4 hours old) via HTTP endpoint
+  - Invokes Analysis Agent HTTP endpoint after data freshness check
+  - Tracks job execution in `AgentJobExecution` table
 
 ## Task Timeline
 
@@ -94,13 +120,15 @@ gantt
     title Milestone 4 - Basic Analysis & Enhanced Content
     dateFormat  YYYY-MM-DD
     section Analysis Agent
-    Plugin system infrastructure             :a1, 2026-02-26, 2d
-    Plugin registry code implementation      :a2, after c1, 1d
-    Dynamic plugin loading                   :a3, after a2, 1d
-    Sentiment analysis plugin                :a4, after a3, 2d
-    Event/context analysis plugin            :a5, after a3, 2d
-    Generic result storage code              :a6, after c2, 1d
-    Cross-plugin insight extraction          :a7, after a6, 1d
+    Agent versioning integration             :a1, 2026-02-26, 1d
+    Agent registration                       :a2, after a1, 1d
+    Plugin system infrastructure             :a3, after a2, 2d
+    Plugin registry code implementation      :a4, after c1, 1d
+    Dynamic plugin loading                   :a5, after a4, 1d
+    Sentiment analysis plugin                :a6, after a5, 2d
+    Event/context analysis plugin            :a7, after a5, 2d
+    Agent Data API integration              :a8, after a7, 1d
+    Cross-plugin insight extraction          :a9, after a8, 1d
     section Content Generation
     Dynamic section mapping system           :b1, after a7, 1d
     Section resolution logic                 :b2, after b1, 1d
@@ -112,8 +140,8 @@ gantt
     Generic analysis result storage          :c2, after c1, 1d
     Link analysis to newsletters             :c3, after c2, 1d
     Plugin config in AgentConfig             :c4, after c1, 1d
-    section Scheduler
-    Data freshness checks                    :d1, after a7, 1d
+    section Orchestrator
+    Data freshness checks                    :d1, after a9, 1d
     Analysis trigger integration             :d2, after d1, 1d
   "
 />
@@ -129,11 +157,15 @@ gantt
 
 ## Success Criteria
 
+- ✅ Agent versioning is functional for Analysis Agent (agent reads active version, includes in outputs)
+- ✅ Agent registration is functional for Analysis Agent (agent registers type and instance, reports heartbeat)
 - ✅ Plugin system infrastructure is functional
-- ✅ Analysis plugins can be registered and loaded dynamically
+- ✅ Analysis plugins can be registered in `AnalysisTypeRegistry` table and loaded dynamically from codebase
+- ✅ Plugin code exists in codebase (`apps/analysis-agent/src/plugins/`) and is loaded by convention
 - ✅ Analysis agent processes collected data using registered plugins
-- ✅ Sentiment analysis plugin calculates and stores sentiment scores
-- ✅ Event/context analysis plugin identifies and assesses events
+- ✅ Sentiment analysis plugin calculates and stores sentiment scores via Agent Data API
+- ✅ Event/context analysis plugin identifies and assesses events via Agent Data API
+- ✅ All analysis outputs include `agentVersion` field
 - ✅ Content generation dynamically includes sections for available analysis plugins
 - ✅ Newsletters show sentiment and event/context information
 - ✅ Insights are relevant and actionable
